@@ -16,11 +16,16 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 public class MessageService {
 
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
+
+    private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
 
     public MessageService(MessageRepository messageRepository, UserRepository userRepository) {
         this.messageRepository = messageRepository;
@@ -39,13 +44,20 @@ public class MessageService {
      */
     @Transactional
     public Message sendMessage(String senderUsername, SendMessageRequest request) {
+
+        logger.info("Attempting to send message from '{}' to '{}'. Type: {}",
+                senderUsername, request.receiverUsername(), request.messageType());
+
         // 1. Find the sender and receiver User entities from the database.
         // The sender is identified by the username from the security context, passed in by the controller.
         User sender = userRepository.findByUsername(senderUsername)
                 .orElseThrow(() -> new UserNotFoundException("Authenticated sender user not found: " + senderUsername));
 
         User receiver = userRepository.findByUsername(request.receiverUsername())
-                .orElseThrow(() -> new UserNotFoundException("Receiver user not found: " + request.receiverUsername()));
+                .orElseThrow(() -> {
+                    logger.warn("Message sending failed. Receiver user '{}' not found.", request.receiverUsername());
+                    return new UserNotFoundException("Receiver user not found: " + request.receiverUsername());
+                });
 
         // 2. Security check: prevent users from sending messages to themselves.
         if (sender.getId().equals(receiver.getId())) {
@@ -71,6 +83,8 @@ public class MessageService {
             message.setOriginalFilename(request.originalFilename());
         }
 
+        logger.info("Message from '{}' to '{}' saved successfully with ID '{}'.",
+                sender.getUsername(), receiver.getUsername(), message.getId()); // <-- 数据库插入操作的日志
         // 4. Save the message to the database and return the persisted entity.
         return messageRepository.save(message);
     }

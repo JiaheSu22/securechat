@@ -7,9 +7,14 @@ import com.eric.securechat.model.User;
 import com.eric.securechat.repository.UserRepository;
 import com.eric.securechat.security.JwtService; // 确保 JwtService 的路径正确
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AuthService {
@@ -18,6 +23,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     // 您的构造函数是正确的，保持不变
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService, AuthenticationManager authenticationManager) {
@@ -61,6 +68,8 @@ public class AuthService {
         // 根据您之前的代码，它接受 User 对象，所以我们用 newUser
         String jwtToken = jwtService.generateToken(newUser);
 
+        logger.info("User '{}' registered successfully.", newUser.getUsername());
+
         // 6. 【核心修改】返回包含令牌的 AuthResponse
         return new AuthResponse(jwtToken);
     }
@@ -73,20 +82,40 @@ public class AuthService {
      * @return AuthResponse 包含生成的JWT令牌。
      */
     public AuthResponse login(LoginRequest request) {
-        // 认证过程
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.username(), // 假设 LoginRequest 是一个 record
-                        request.password()
-                )
-        );
+        try {
+            // 1. 尝试认证，这是可能抛出异常的地方
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.username(),
+                            request.password()
+                    )
+            );
 
-        // 获取用户信息
-        User user = userRepository.findByUsername(request.username())
-                .orElseThrow(() -> new IllegalArgumentException("User not found after authentication"));
+            // --- 只有认证成功，代码才会走到这里 ---
 
-        // 生成并返回JWT
-        String jwtToken = jwtService.generateToken(user);
-        return new AuthResponse(jwtToken);
+            // 2. 获取用户信息
+            User user = userRepository.findByUsername(request.username())
+                    .orElseThrow(() -> {
+                        // 这是一个严重的内部不一致错误：认证通过了但数据库找不到用户
+                        logger.error("CRITICAL: User '{}' passed authentication but was not found in database.", request.username());
+                        return new IllegalStateException("User not found after authentication. Data inconsistency.");
+                    });
+
+            // 3. 生成JWT
+            String jwtToken = jwtService.generateToken(user);
+            logger.info("User '{}' logged in successfully.", user.getUsername());
+            return new AuthResponse(jwtToken);
+
+        } catch (AuthenticationException e) {
+            // --- 认证失败，代码会跳到这里 ---
+
+            // 4. 记录业务警告日志（不带堆栈）
+            logger.warn("Failed login attempt for username '{}'. Reason: {}",
+                    request.username(), e.getMessage());
+
+            // 5. 抛出一个对API友好的异常
+            // Spring Security会自动将这个异常映射为 401 Unauthorized 状态码
+            throw new BadCredentialsException("Invalid username or password");
+        }
     }
 }

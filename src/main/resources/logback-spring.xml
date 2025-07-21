@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 引入 Spring Boot 的默认配置 -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml" />
+
+    <!-- 异常转换规则：只打印根原因和最多15行堆栈 -->
+    <conversionRule conversionWord="exShort"
+                    class="ch.qos.logback.classic.pattern.RootCauseFirstThrowableProxyConverter">
+        <maxDepth>15</maxDepth>
+    </conversionRule>
+
+    <!-- 控制台 Appender -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!--
+              注意这里，我们用 %exShort 替换了默认的 %wEx
+              %msg%n%exShort 表示先打印消息，然后换行，再打印精简后的异常
+            -->
+            <pattern>${CONSOLE_LOG_PATTERN:-%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n%exShort}</pattern>
+            <charset>utf8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 文件 Appender -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>secure-chat.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>secure-chat.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN:-%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n%exShort}</pattern>
+            <charset>utf8</charset>
+        </encoder>
+    </appender>
+
+    <!--
+      设置日志级别。
+      com.eric.securechat 设置为 DEBUG，可以看到我们自己的详细日志。
+      root 设置为 INFO，过滤掉大部分框架的INFO日志。
+    -->
+    <logger name="com.eric.securechat" level="DEBUG"/>
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="FILE" />
+    </root>
+
+</configuration>
