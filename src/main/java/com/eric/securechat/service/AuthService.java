@@ -36,19 +36,19 @@ public class AuthService {
      */
     public AuthResponse register(RegisterRequest request) {
         // 1. 检查用户名是否已存在 (您的逻辑)
-        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
+        if (userRepository.findByUsername(request.username()).isPresent()) {
             throw new IllegalStateException("Error: Username is already taken!");
         }
 
         // 2. 创建新用户并加密密码 (您的逻辑)
         User newUser = new User();
-        newUser.setUsername(request.getUsername());
-        newUser.setPassword(passwordEncoder.encode(request.getPassword()));
+        newUser.setUsername(request.username());
+        newUser.setPassword(passwordEncoder.encode(request.password()));
 
         // 3. 处理昵称 (您的逻辑)
-        String nickname = request.getNickname();
+        String nickname = request.nickname();
         if (nickname == null || nickname.trim().isEmpty()) {
-            newUser.setNickname(request.getUsername());
+            newUser.setNickname(request.username());
         } else {
             newUser.setNickname(nickname.trim());
         }

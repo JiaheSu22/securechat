@@ -9,19 +9,25 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 public interface MessageRepository extends JpaRepository<Message, UUID> {
 
     /**
      * Finds all messages exchanged between two users, sorted by timestamp.
-     * This query fetches the complete conversation history.
      *
-     * @param user1 The first user in the conversation.
-     * @param user2 The second user in the conversation.
+     * @param user1Id The ID of the first user.
+     * @param user2Id The ID of the second user.
      * @return A list of messages forming the conversation.
      */
     @Query("SELECT m FROM Message m WHERE " +
-            "(m.sender = :user1 AND m.receiver = :user2) OR " +
-            "(m.sender = :user2 AND m.receiver = :user1) " +
+            "(m.sender.id = :user1Id AND m.receiver.id = :user2Id) OR " +
+            "(m.sender.id = :user2Id AND m.receiver.id = :user1Id) " +
             "ORDER BY m.timestamp ASC")
-    List<Message> findConversation(@Param("user1") User user1, @Param("user2") User user2);
+    List<Message> findConversation(@Param("user1Id") UUID user1Id, @Param("user2Id") UUID user2Id);
+
+
+    @Query("SELECT m FROM Message m WHERE m.encryptedContent LIKE %:text%")
+    List<Message> findMessagesContainingText(@Param("text") String text);
 }

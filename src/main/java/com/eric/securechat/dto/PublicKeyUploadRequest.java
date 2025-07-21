@@ -2,17 +2,11 @@ package com.eric.securechat.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-public class PublicKeyUploadRequest {
-
-    @NotBlank(message = "Public key cannot be blank")
-    private String publicKey;
-
-    // Getters and Setters
-    public String getPublicKey() {
-        return publicKey;
-    }
-
-    public void setPublicKey(String publicKey) {
-        this.publicKey = publicKey;
-    }
-}
+/**
+ * DTO for a client request to upload their public key.
+ * Converted to a Record for simplicity and immutability.
+ */
+public record PublicKeyUploadRequest(
+        @NotBlank(message = "Public key cannot be blank")
+        String publicKey
+) {}

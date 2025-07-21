@@ -1,35 +1,25 @@
 package com.eric.securechat.dto;
 
+import com.eric.securechat.model.MessageType;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 /**
  * DTO for a client request to send a new message.
+ * Now implemented as a Record for conciseness and immutability.
  */
-public class SendMessageRequest {
+public record SendMessageRequest(
+        @NotBlank
+        String receiverUsername,
 
-    /**
-     * The username of the message recipient.
-     */
-    private String receiverUsername;
+        @NotBlank
+        String encryptedContent,
 
-    /**
-     * The end-to-end encrypted content of the message.
-     */
-    private String encryptedContent;
+        @NotNull
+        MessageType messageType,
 
-    // --- Getters and Setters ---
+        String fileUrl,
 
-    public String getReceiverUsername() {
-        return receiverUsername;
-    }
-
-    public void setReceiverUsername(String receiverUsername) {
-        this.receiverUsername = receiverUsername;
-    }
-
-    public String getEncryptedContent() {
-        return encryptedContent;
-    }
-
-    public void setEncryptedContent(String encryptedContent) {
-        this.encryptedContent = encryptedContent;
-    }
+        String originalFilename
+) {
 }

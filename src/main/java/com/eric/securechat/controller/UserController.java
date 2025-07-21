@@ -30,7 +30,7 @@ public class UserController {
             @Valid @RequestBody PublicKeyUploadRequest request) {
 
         String currentUsername = userDetails.getUsername();
-        userService.updateUserPublicKey(currentUsername, request.getPublicKey());
+        userService.updateUserPublicKey(currentUsername, request.publicKey());
         return ResponseEntity.ok().build();
     }
 

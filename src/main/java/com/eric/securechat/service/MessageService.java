@@ -2,7 +2,9 @@ package com.eric.securechat.service;
 
 import com.eric.securechat.dto.MessageResponse;
 import com.eric.securechat.dto.SendMessageRequest;
+import com.eric.securechat.exception.UserNotFoundException;
 import com.eric.securechat.model.Message;
+import com.eric.securechat.model.MessageType;
 import com.eric.securechat.model.User;
 import com.eric.securechat.repository.MessageRepository;
 import com.eric.securechat.repository.UserRepository;
@@ -26,84 +28,79 @@ public class MessageService {
     }
 
     /**
-     * Creates and saves a new message sent from the authenticated user to a specified receiver.
+     *
+     * Creates and saves a new message from a specified sender to a receiver.
+     * This method is designed to be called by the controller, which provides the sender's identity.
      * The entire operation is transactional, ensuring data integrity.
      *
+     * @param senderUsername The username of the user sending the message.
      * @param request The request DTO containing the receiver and message content.
-     * @return A DTO representation of the newly saved message.
+     * @return The newly saved Message entity. (返回实体而非DTO，以供Controller后续处理)
      */
     @Transactional
-    public MessageResponse sendMessage(SendMessageRequest request) {
-        // 1. Get the username of the currently authenticated user from the security context.
-        String senderUsername = getCurrentUsername();
-
-        // 2. Find the sender and receiver User entities from the database.
+    public Message sendMessage(String senderUsername, SendMessageRequest request) {
+        // 1. Find the sender and receiver User entities from the database.
+        // The sender is identified by the username from the security context, passed in by the controller.
         User sender = userRepository.findByUsername(senderUsername)
-                .orElseThrow(() -> new IllegalStateException("Authenticated user not found in database. This should not happen."));
+                .orElseThrow(() -> new UserNotFoundException("Authenticated sender user not found: " + senderUsername));
 
-        User receiver = userRepository.findByUsername(request.getReceiverUsername())
-                .orElseThrow(() -> new IllegalArgumentException("Receiver user not found: " + request.getReceiverUsername()));
+        User receiver = userRepository.findByUsername(request.receiverUsername())
+                .orElseThrow(() -> new UserNotFoundException("Receiver user not found: " + request.receiverUsername()));
 
-        // 3. Security check: prevent users from sending messages to themselves.
+        // 2. Security check: prevent users from sending messages to themselves.
         if (sender.getId().equals(receiver.getId())) {
             throw new IllegalArgumentException("Sender and receiver cannot be the same person.");
         }
 
-        // 4. Create and populate a new Message entity.
+        // 3. Create and populate a new Message entity.
         Message message = new Message();
         message.setSender(sender);
         message.setReceiver(receiver);
-        message.setEncryptedContent(request.getEncryptedContent());
-        // The timestamp will be automatically set by the @PrePersist annotation in the Message entity.
+        message.setEncryptedContent(request.encryptedContent());
+        message.setMessageType(request.messageType());
+        // 注意：我们不再手动设置时间戳 (message.setTimestamp(Instant.now()))
+        // 而是依赖你在 Message 实体中定义的 @PrePersist 注解来自动完成，这更健壮。
 
-        // 5. Save the message to the database.
-        Message savedMessage = messageRepository.save(message);
+        // ===== 新增逻辑：如果是文件消息，保存文件信息 =====
+        if (request.messageType() == MessageType.FILE) {
+            if (request.fileUrl() == null || request.originalFilename() == null) {
+                // 做一个基本的数据校验
+                throw new IllegalArgumentException("File message must contain fileUrl and originalFilename.");
+            }
+            message.setFileUrl(request.fileUrl());
+            message.setOriginalFilename(request.originalFilename());
+        }
 
-        // 6. Convert the saved entity to a DTO and return it.
-        return convertToResponse(savedMessage);
+        // 4. Save the message to the database and return the persisted entity.
+        return messageRepository.save(message);
     }
 
     /**
-     * Retrieves the full conversation history between the authenticated user and another specified user.
-     * The operation is marked as read-only for performance optimization.
      *
-     * @param otherUsername The username of the other participant in the conversation.
-     * @return A list of MessageResponse DTOs, sorted by timestamp.
+     * Retrieves the full conversation history between two specified users.
+     * The operation is marked as read-only for performance optimization.
+     * This version is decoupled from the Security Context for better testability.
+     *
+     * @param currentUsername The username of the first participant (typically the authenticated user).
+     * @param otherUsername The username of the second participant in the conversation.
+     * @return A list of Message entities, sorted by timestamp. (返回实体，让Controller处理转换)
      */
     @Transactional(readOnly = true)
-    public List<MessageResponse> getConversation(String otherUsername) {
-        // 1. Get the username of the currently authenticated user.
-        String currentUsername = getCurrentUsername();
-
-        // 2. Find the User entities for both participants in the conversation.
+    public List<Message> getConversation(String currentUsername, String otherUsername) {
+        // 1. Find the User entities for both participants.
+        // The service now simply trusts the usernames provided by the controller.
         User currentUser = userRepository.findByUsername(currentUsername)
-                .orElseThrow(() -> new IllegalStateException("Authenticated user not found in database."));
+                .orElseThrow(() -> new UserNotFoundException("User not found: " + currentUsername));
 
         User otherUser = userRepository.findByUsername(otherUsername)
-                .orElseThrow(() -> new IllegalArgumentException("Other user not found: " + otherUsername));
+                .orElseThrow(() -> new UserNotFoundException("User not found: " + otherUsername));
 
-        // 3. Call the custom repository method to fetch the conversation.
-        List<Message> messages = messageRepository.findConversation(currentUser, otherUser);
-
-        // 4. Convert the list of Message entities to a list of MessageResponse DTOs.
-        return messages.stream()
-                .map(this::convertToResponse)
-                .collect(Collectors.toList());
+        // 2. Call the custom repository method to fetch the conversation.
+        // 注意：我们直接返回 List<Message>，将DTO转换的责任留给Controller。
+        // 这与我们对 sendMessage 的修改保持了一致性。
+        return messageRepository.findConversation(currentUser.getId(), otherUser.getId());
     }
 
-    /**
-     * A helper method to get the username of the currently authenticated user from Spring Security's context.
-     * @return The username of the logged-in user.
-     */
-    private String getCurrentUsername() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (principal instanceof UserDetails) {
-            return ((UserDetails) principal).getUsername();
-        } else {
-            // This case might happen in some testing scenarios or if the principal is a simple string.
-            return principal.toString();
-        }
-    }
 
     /**
      * A private helper method to encapsulate the logic of converting a Message entity to a MessageResponse DTO.
@@ -116,7 +113,10 @@ public class MessageService {
                 message.getSender().getUsername(),
                 message.getReceiver().getUsername(),
                 message.getEncryptedContent(),
-                message.getTimestamp()
+                message.getMessageType(),
+                message.getTimestamp(),
+                message.getFileUrl(),
+                message.getOriginalFilename()
         );
     }
 }

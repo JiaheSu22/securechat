@@ -31,15 +31,15 @@ public class UserService {
         validateRegistrationRequest(registerRequest);
 
         // 【防御性校验 2】检查用户名是否存在
-        if (userRepository.findByUsername(registerRequest.getUsername()).isPresent()) {
+        if (userRepository.findByUsername(registerRequest.username()).isPresent()) {
             // 这个异常现在会被 GlobalExceptionHandler 正确处理，并返回 409
             throw new IllegalStateException("Username already taken");
         }
 
         User newUser = new User();
-        newUser.setUsername(registerRequest.getUsername());
-        newUser.setNickname(registerRequest.getNickname());
-        newUser.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
+        newUser.setUsername(registerRequest.username());
+        newUser.setNickname(registerRequest.nickname());
+        newUser.setPassword(passwordEncoder.encode(registerRequest.password()));
 
         return userRepository.save(newUser);
     }
@@ -49,11 +49,11 @@ public class UserService {
      */
     private void validateRegistrationRequest(RegisterRequest request) {
         // 你可以在这里添加任何你认为重要的、不能单靠 @Valid 的校验
-        if (request.getPassword() == null || request.getPassword().length() < 6) {
+        if (request.password() == null || request.password().length() < 6) {
             // 这个异常会被 GlobalExceptionHandler 正确处理，并返回 400
             throw new IllegalArgumentException("Password must be at least 6 characters long");
         }
-        if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
+        if (request.username() == null || request.username().trim().isEmpty()) {
             throw new IllegalArgumentException("Username cannot be blank");
         }
         // ... 可以添加更多校验规则
