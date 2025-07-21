@@ -1,7 +1,7 @@
 package com.eric.securechat.controller;
 
 import com.eric.securechat.dto.*;
-import com.eric.securechat.service.AuthService; // 确保引入AuthService
+import com.eric.securechat.service.AuthService;
 import com.eric.securechat.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,22 +21,6 @@ public class UserController {
     public UserController(UserService userService, AuthService authService) {
         this.userService = userService;
         this.authService = authService;
-    }
-
-    // Endpoint: 用户注册
-    @PostMapping("/register")
-    public ResponseEntity<String> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
-        userService.registerUser(registerRequest);
-        return ResponseEntity.ok("User registered successfully");
-    }
-
-    // Endpoint: 用户登录 (修正版)
-    @PostMapping("/login")
-    public ResponseEntity<AuthResponse> loginUser(@RequestBody LoginRequest loginRequest) {
-        // 【核心修正】: 直接将整个 loginRequest 对象传递给 authService.login 方法
-        AuthResponse authResponse = authService.login(loginRequest);
-
-        return ResponseEntity.ok(authResponse);
     }
 
     // Endpoint: 上传/更新自己的公钥 (采纳您的 PUT /me/key)

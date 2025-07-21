@@ -8,6 +8,6 @@ public class SecurechatApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(SecurechatApplication.class, args);
+        System.out.println("***************************SEVER STARTED*****************************");
     }
-
 }

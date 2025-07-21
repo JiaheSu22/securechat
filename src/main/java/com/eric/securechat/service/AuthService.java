@@ -37,7 +37,7 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         // 1. 检查用户名是否已存在 (您的逻辑)
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
-            throw new RuntimeException("Error: Username is already taken!");
+            throw new IllegalStateException("Error: Username is already taken!");
         }
 
         // 2. 创建新用户并加密密码 (您的逻辑)

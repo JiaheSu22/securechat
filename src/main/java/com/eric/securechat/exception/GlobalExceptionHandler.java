@@ -29,6 +29,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<Object> handleIllegalArgumentException(IllegalArgumentException ex, WebRequest request) {
         return buildErrorResponse(ex, HttpStatus.BAD_REQUEST, request);
     }
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Object> handleIllegalStateException(IllegalStateException ex, WebRequest request) {
+        // 返回 409 Conflict 状态码，表示资源冲突
+        return buildErrorResponse(ex, HttpStatus.CONFLICT, request);
+    }
 
     // 捕获所有其他未能处理的异常，作为最后的防线，返回 500
     @ExceptionHandler(Exception.class)
