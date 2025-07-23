@@ -231,7 +231,7 @@ public class FriendshipServiceImpl implements FriendshipService {
                 .map(friendship ->
                         friendship.getRequester().equals(currentUser) ? friendship.getAddressee() : friendship.getRequester()
                 )
-                .map(user -> new UserDto(user.getId(), user.getUsername()))
+                .map(user -> new UserDto(user.getId(), user.getUsername(), user.getNickname()))
                 .collect(Collectors.toList());
     }
 

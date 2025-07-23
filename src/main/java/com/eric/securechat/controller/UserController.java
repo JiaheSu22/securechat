@@ -1,7 +1,6 @@
 package com.eric.securechat.controller;
 
 import com.eric.securechat.dto.*;
-import com.eric.securechat.service.AuthService;
 import com.eric.securechat.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,12 +14,10 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
-    private final AuthService authService; // 引入 AuthService 用于登录
 
     @Autowired
-    public UserController(UserService userService, AuthService authService) {
+    public UserController(UserService userService) {
         this.userService = userService;
-        this.authService = authService;
     }
 
     // Endpoint: 上传/更新自己的公钥 (采纳您的 PUT /me/key)

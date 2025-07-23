@@ -13,6 +13,5 @@ public class UserDto {
     private UUID id;
     private String username;
     // 未来可以添加头像URL、昵称等公开信息
-    // private String avatarUrl;
-    // private String nickname;
+     private String nickname;
 }
