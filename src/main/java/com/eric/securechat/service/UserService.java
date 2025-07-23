@@ -1,6 +1,7 @@
 package com.eric.securechat.service;
 
 import com.eric.securechat.dto.RegisterRequest;
+import com.eric.securechat.dto.UserDto;
 import com.eric.securechat.dto.UserPublicKeyResponse;
 import com.eric.securechat.model.User;
 import com.eric.securechat.repository.UserRepository;
@@ -85,5 +86,17 @@ public class UserService {
 
         // Service层负责构建并返回DTO，Controller只负责传递
         return new UserPublicKeyResponse(user.getUsername(), user.getNickname(), user.getPublicKey());
+    }
+
+    /**
+     * 【新增方法】根据用户名获取用户公开信息
+     * @param username 用户名
+     * @return 包含用户ID、用户名和昵称的DTO
+     */
+    @Transactional(readOnly = true)
+    public UserDto getUserProfile(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User '" + username + "' not found."));
+        return new UserDto(user.getId(), user.getUsername(), user.getNickname());
     }
 }

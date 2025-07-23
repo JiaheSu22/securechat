@@ -1,5 +1,7 @@
 package com.eric.securechat.service;
 
+import com.eric.securechat.dto.FriendRequestViewDto;
+import com.eric.securechat.dto.FriendStatusDto;
 import com.eric.securechat.dto.UserDto;
 import com.eric.securechat.model.Friendship;
 import com.eric.securechat.model.User;
@@ -8,6 +10,13 @@ import java.util.List;
 import java.util.Optional;
 
 public interface FriendshipService {
+
+    /**
+     * 【新增】获取当前用户收到的、所有待处理的好友请求
+     * @param currentUsername 当前登录用户的用户名
+     * @return 一个包含好友请求信息的 DTO 列表
+     */
+    List<FriendRequestViewDto> getPendingRequests(String currentUsername);
 
     /**
      * 发送一个好友请求。
@@ -36,7 +45,7 @@ public interface FriendshipService {
      */
     Friendship declineRequest(String requesterUsername, String addresseeUsername) throws Exception;
 
-    List<UserDto> getFriendsList(String username);
+    List<FriendStatusDto> getFriendsList(String username);
 
     Friendship unfriend(String currentUsername, String friendUsername) throws Exception;
 

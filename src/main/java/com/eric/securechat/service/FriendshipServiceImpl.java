@@ -1,5 +1,7 @@
 package com.eric.securechat.service;
 
+import com.eric.securechat.dto.FriendRequestViewDto;
+import com.eric.securechat.dto.FriendStatusDto;
 import com.eric.securechat.dto.UserDto;
 import com.eric.securechat.model.Friendship;
 import com.eric.securechat.model.FriendshipId;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @Slf4j
@@ -219,19 +222,58 @@ public class FriendshipServiceImpl implements FriendshipService {
      * 使用了在 Repository 中新增的 `findAllByUserAndStatus` 方法，将两次数据库查询合并为一次。
      */
     @Override
-    public List<UserDto> getFriendsList(String username) {
-        log.debug("Fetching friend list for user '{}'", username);
+    public List<FriendStatusDto> getFriendsList(String username) {
+        log.debug("Fetching friend and blocked list for user '{}'", username);
         User currentUser = findUserByUsername(username);
 
-        // 使用新的、更高效的查询
+        // 1. 获取所有 ACCEPTED 状态的关系
         List<Friendship> acceptedFriendships = friendshipRepository.findAllByUserAndStatus(currentUser, FriendshipStatus.ACCEPTED);
 
-        return acceptedFriendships.stream()
-                // 对于每一条好友关系，如果我是请求者，则好友是接收者，反之亦然
-                .map(friendship ->
-                        friendship.getRequester().equals(currentUser) ? friendship.getAddressee() : friendship.getRequester()
-                )
-                .map(user -> new UserDto(user.getId(), user.getUsername(), user.getNickname()))
+        // 2. 获取所有 BLOCKED 状态的关系
+        List<Friendship> blockedFriendships = friendshipRepository.findAllByUserAndStatus(currentUser, FriendshipStatus.BLOCKED);
+
+        // 3. 合并两个列表
+        List<Friendship> allRelations = Stream.concat(acceptedFriendships.stream(), blockedFriendships.stream())
+                .collect(Collectors.toList());
+
+        return allRelations.stream()
+                .map(friendship -> {
+                    // 找出关系中的另一个人
+                    User otherUser = friendship.getRequester().equals(currentUser) ? friendship.getAddressee() : friendship.getRequester();
+                    // 创建新的 DTO，包含用户信息和关系状态
+                    return new FriendStatusDto(
+                            otherUser.getId(),
+                            otherUser.getUsername(),
+                            otherUser.getNickname(),
+                            friendship.getStatus()
+                    );
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取当前用户收到的所有待处理的好友请求。
+     * @param currentUsername 当前用户的用户名
+     * @return FriendRequestViewDto 列表
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<FriendRequestViewDto> getPendingRequests(String currentUsername) {
+        log.debug("Fetching pending friend requests for user '{}'", currentUsername);
+        User currentUser = findUserByUsername(currentUsername);
+
+        List<Friendship> pendingFriendships = friendshipRepository.findByAddresseeAndStatus(currentUser, FriendshipStatus.PENDING);
+
+        return pendingFriendships.stream()
+                .map(friendship -> {
+                    User requester = friendship.getRequester();
+                    return new FriendRequestViewDto(
+                            requester.getId(),
+                            requester.getUsername(),
+                            requester.getNickname(),
+                            friendship.getCreatedAt()
+                    );
+                })
                 .collect(Collectors.toList());
     }
 
@@ -272,12 +314,16 @@ public class FriendshipServiceImpl implements FriendshipService {
             throw new SecurityException("Only the user who initiated the block can unblock.");
         }
 
-        // 解除拉黑 = 删除关系记录，恢复陌生人状态
-        friendshipRepository.delete(friendship);
-        log.info("User '{}' successfully unblocked user '{}'. The relationship record has been removed.", currentUserUsername, blockedUsername);
+        // 恢复好友关系，而不是删除
+        friendship.setStatus(FriendshipStatus.ACCEPTED);
+        friendship.setActionUser(null); // 清除执行拉黑操作的用户记录
+        Friendship updatedFriendship = friendshipRepository.save(friendship);
 
-        // 兼容接口，返回被删除的实体
-        return friendship;
+        log.info("User '{}' successfully unblocked user '{}'. Their friendship status has been restored to ACCEPTED.",
+                currentUserUsername, blockedUsername);
+
+        // 返回更新后的实体
+        return updatedFriendship;
     }
 
     /**

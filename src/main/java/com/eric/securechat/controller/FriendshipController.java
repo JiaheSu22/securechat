@@ -1,6 +1,8 @@
 package com.eric.securechat.controller;
 
 import com.eric.securechat.dto.FriendRequestDto;
+import com.eric.securechat.dto.FriendRequestViewDto;
+import com.eric.securechat.dto.FriendStatusDto;
 import com.eric.securechat.dto.MessageResponse;
 import com.eric.securechat.dto.UserDto;
 import com.eric.securechat.model.Friendship;
@@ -117,14 +119,25 @@ public class FriendshipController {
         }
     }
 
+    /**
+     * 获取所有待处理的好友请求
+     * GET /api/friendships/requests/pending
+     */
+    @GetMapping("/requests/pending")
+    public ResponseEntity<List<FriendRequestViewDto>> getPendingRequests(Principal principal) {
+        String currentUsername = principal.getName();
+        List<FriendRequestViewDto> requests = friendshipService.getPendingRequests(currentUsername);
+        return ResponseEntity.ok(requests);
+    }
+
     @GetMapping("/my-friends")
-    public ResponseEntity<List<UserDto>> getMyFriends() {
+    public ResponseEntity<List<FriendStatusDto>> getMyFriends() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String currentUsername = authentication.getName();
 
-        List<UserDto> friends = friendshipService.getFriendsList(currentUsername);
+        List<FriendStatusDto> friendsWithStatus = friendshipService.getFriendsList(currentUsername);
 
-        return ResponseEntity.ok(friends);
+        return ResponseEntity.ok(friendsWithStatus);
     }
 
     // 在 FriendshipController.java 中

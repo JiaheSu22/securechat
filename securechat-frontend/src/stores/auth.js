@@ -46,9 +46,11 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(username, password) {
     try {
       const res = await authService.login({ username, password })
-      const { token: jwt, ...userData } = res.data
+      const { token: jwt } = res.data
       setToken(jwt)
-      setUser(userData)
+      // 登录后获取用户详细信息
+      const userInfoRes = await userService.getMe()
+      setUser(userInfoRes.data)
       // 登录后不处理密钥，密钥只在注册时生成
       return { success: true }
     } catch (e) {
@@ -58,13 +60,13 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function register({ username, password, nickname }) {
     try {
-      // 1. 注册
-      await authService.register({ username, password, nickname })
-      // 2. 注册成功后自动登录
-      const loginRes = await authService.login({ username, password })
-      const { token: jwt, ...userData } = loginRes.data
+      // 1. 注册，拿到 token
+      const registerRes = await authService.register({ username, password, nickname })
+      const jwt = registerRes.data.token
       setToken(jwt)
-      setUser(userData)
+      // 2. 获取用户详细信息
+      const userInfoRes = await userService.getMe()
+      setUser(userInfoRes.data)
       // 3. 生成密钥对
       const { privateKey: priv, publicKey } = generateKeyPair()
       setPrivateKey(priv)
@@ -74,7 +76,7 @@ export const useAuthStore = defineStore('auth', () => {
         .replace('-----END PUBLIC KEY-----', '')
         .replace(/\n/g, '')
         .trim();
-      // 5. 上传公钥，确保token已写入localStorage
+      // 5. 上传公钥
       await userService.uploadPublicKey({ publicKey: cleanPublicKey })
       return { success: true }
     } catch (e) {

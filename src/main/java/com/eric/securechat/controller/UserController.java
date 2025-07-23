@@ -20,6 +20,13 @@ public class UserController {
         this.userService = userService;
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> getMyProfile(@AuthenticationPrincipal UserDetails userDetails) {
+        String username = userDetails.getUsername();
+        UserDto userDto = userService.getUserProfile(username);
+        return ResponseEntity.ok(userDto);
+    }
+
     // Endpoint: 上传/更新自己的公钥 (采纳您的 PUT /me/key)
     @PutMapping("/me/key")
     public ResponseEntity<Void> uploadMyPublicKey(

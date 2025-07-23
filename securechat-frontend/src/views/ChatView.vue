@@ -25,10 +25,10 @@
         </div>
 
         <!-- 好友申请 -->
-        <div class="friend-requests-section" @click="() => ElMessage.info('Friend request list coming soon!')">
+        <div class="friend-requests-section" @click="openFriendRequestsDialog">
           <el-icon><Bell /></el-icon>
           <span>Friend Requests</span>
-          <el-badge :value="3" class="request-badge" />
+          <el-badge :value="friendRequests.length" class="request-badge" />
         </div>
 
         <!-- 联系人列表 -->
@@ -52,7 +52,7 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item
-                    v-if="!isBlocked(user.id)"
+                    v-if="user.status !== 'BLOCKED'"
                     :command="{ action: 'block', user: user }"
                   >
                     <el-icon><CircleClose /></el-icon>
@@ -129,39 +129,34 @@
       <div class="add-contact-dialog-content">
         <div class="add-contact-search-bar">
           <el-input
-            v-model="searchNewContactQuery"
-            placeholder="Search by username or nickname"
+            v-model="addFriendUsername"
+            placeholder="Enter username to send friend request"
             :prefix-icon="Search"
-            @keyup.enter="handleSearchNewContacts"
+            @keyup.enter="handleSendFriendRequest"
             clearable
             class="add-contact-input"
           />
-          <el-button type="primary" @click="handleSearchNewContacts" class="search-dialog-btn">Search</el-button>
-        </div>
-      </div>
-      <div class="search-results-list">
-        <div v-if="!searchedUsers.length" class="empty-results">
-          Search for users in the system.
-        </div>
-        <div v-for="user in searchedUsers" :key="user.id" class="search-result-item">
-          <el-avatar :style="{ backgroundColor: getAvatarColor(user) }" size="small" />
-          <div class="contact-info">
-            <span class="contact-name">{{ user.nickname }}</span>
-            <span class="contact-last-msg">@{{ user.username }}</span>
-          </div>
-          <el-button
-            type="primary"
-            plain
-            size="small"
-            :disabled="user.requestSent"
-            @click="sendFriendRequest(user)"
-          >
-            {{ user.requestSent ? 'Request Sent' : 'Add' }}
-          </el-button>
+          <el-button type="primary" @click="handleSendFriendRequest" class="search-dialog-btn">Send Request</el-button>
         </div>
       </div>
       <template #footer>
         <el-button @click="addContactDialogVisible = false">Close</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 好友请求弹窗 -->
+    <el-dialog v-model="friendRequestsDialogVisible" title="Pending Friend Requests" width="400px">
+      <div v-if="!friendRequests.length">No pending requests.</div>
+      <div v-for="req in friendRequests" :key="req.id" class="friend-request-item">
+        <el-avatar :style="{ backgroundColor: getAvatarColor(req) }" size="small" />
+        <span>{{ req.nickname }} (@{{ req.username }})</span>
+        <div class="request-actions">
+          <el-button size="small" type="success" @click="handleAcceptRequest(req)">Accept</el-button>
+          <el-button size="small" type="warning" @click="handleDeclineRequest(req)">Decline</el-button>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="friendRequestsDialogVisible = false">Close</el-button>
       </template>
     </el-dialog>
   </div>
@@ -174,6 +169,7 @@ import { useAuthStore } from '@/stores/auth';
 import { ElMessageBox, ElNotification, ElMessage } from 'element-plus';
 // *** FIX: 引入所需图标 ***
 import { Promotion, Search, Paperclip, Plus, MoreFilled, Delete, Bell, Lock, CircleClose, SuccessFilled } from '@element-plus/icons-vue';
+import { friendshipService } from '@/services/friendshipService';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -186,19 +182,12 @@ const messages = ref([]);
 const messageContainerRef = ref(null);
 const searchQuery = ref('');
 const blockedUsers = ref(new Set()); // 新增：用于存储被拉黑的用户ID
+const friendRequests = ref([]);
 
 // --- 好友管理状态 ---
 const addContactDialogVisible = ref(false);
-const searchNewContactQuery = ref('');
-const searchedUsers = ref([]);
-const allUsersInSystem = ref([ // 模拟全系统所有用户
-  { id: 1, username: 'alice', nickname: 'Alice' },
-  { id: 2, username: 'bob', nickname: 'Bob' },
-  { id: 3, username: 'charlie', nickname: 'Charlie' },
-  { id: 4, username: 'diana', nickname: 'Diana' },
-  { id: 5, username: 'ella', nickname: 'Ella' },
-  { id: 6, username: 'frank', nickname: 'Frank' },
-]);
+const addFriendUsername = ref("");
+const friendRequestsDialogVisible = ref(false);
 
 // --- 计算属性 ---
 const filteredContactList = computed(() => {
@@ -210,29 +199,40 @@ const filteredContactList = computed(() => {
 });
 
 const isChatBlocked = computed(() => {
-  if (!currentChatTarget.value) return false;
-  return blockedUsers.value.has(currentChatTarget.value.id);
+  return currentChatTarget.value?.status === 'BLOCKED';
 });
 
 // --- 颜色池和头像颜色 ---
 const colorPool = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FED766', '#9B59B6', '#F39C12', '#1ABC9C', '#3498DB'];
 const getAvatarColor = (user) => {
-  if (!user || (!user.id && !user.username)) return '#CCCCCC';
-  const id = user.id || user.username.length;
-  const index = id % colorPool.length;
-  return colorPool[index];
+  if (!user) return '#CCCCCC';
+  // 用 username 做 hash，保证同一用户颜色一致
+  const key = user.username || user.nickname || '';
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = key.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colorPool[Math.abs(hash) % colorPool.length];
 };
 
 // --- 生命周期钩子 ---
-onMounted(() => {
+onMounted(async () => {
   if (authStore.isAuthenticated) {
-    const mockUsers = [
-      { id: 1, username: 'alice', nickname: 'Alice' },
-      { id: 2, username: 'bob', nickname: 'Bob' },
-      { id: 3, username: 'charlie', nickname: 'Charlie' },
-      { id: 4, username: 'diana', nickname: 'Diana' },
-    ];
-    contactList.value = mockUsers.filter(u => u.username !== authStore.user?.username);
+    // 获取好友列表
+    try {
+      const res = await friendshipService.getMyFriends();
+      contactList.value = res.data;
+      blockedUsers.value = new Set(contactList.value.filter(u => u.status === 'BLOCKED').map(u => u.id));
+    } catch (e) {
+      contactList.value = [];
+    }
+    // 获取好友请求
+    try {
+      const reqRes = await friendshipService.getPendingRequests();
+      friendRequests.value = reqRes.data;
+    } catch (e) {
+      friendRequests.value = [];
+    }
   }
 });
 
@@ -243,19 +243,19 @@ const selectChat = (user) => {
   currentChatTarget.value = user;
   messages.value = [];
 
-  // 添加端到端加密的系统欢迎消息
+  // 系统欢迎消息
   messages.value.push({
     id: 'system-welcome',
     text: 'Messages are end-to-end encrypted. No one outside of this chat, not even Secure Chat, can read them.',
     sender: 'system',
-    encrypted: true // 添加一个标志用于显示锁图标
+    encrypted: true
   });
 
-  // 如果用户被拉黑，显示提示
-  if (isBlocked(user.id)) {
+  // 如果被拉黑，显示系统提示
+  if (user.status === 'BLOCKED') {
     messages.value.push({
       id: 'system-blocked',
-      text: `You have blocked ${user.nickname}. Unblock them to send messages.`,
+      text: 'You have blocked this user. You can no longer send messages.',
       sender: 'system'
     });
   }
@@ -330,38 +330,24 @@ const handleAttachFile = () => {
 
 // --- 好友管理方法 ---
 const openAddContactDialog = () => {
-  searchNewContactQuery.value = '';
-  searchedUsers.value = [];
+  addFriendUsername.value = "";
   addContactDialogVisible.value = true;
 };
 
-const handleSearchNewContacts = () => {
-  const query = searchNewContactQuery.value.toLowerCase().trim();
-  if (!query) {
-    searchedUsers.value = [];
+const handleSendFriendRequest = async () => {
+  const username = addFriendUsername.value.trim();
+  if (!username) {
+    ElMessage.warning("Please enter a username.");
     return;
   }
-  const existingContactIds = new Set(contactList.value.map(c => c.id));
-
-  searchedUsers.value = allUsersInSystem.value.filter(user =>
-    user.username !== authStore.user.username &&
-    !existingContactIds.has(user.id) &&
-    (user.username.toLowerCase().includes(query) || user.nickname.toLowerCase().includes(query))
-  ).map(user => ({ ...user, requestSent: false }));
-
-  if (!searchedUsers.value.length) {
-    ElMessage.info('No new users found.');
+  try {
+    await friendshipService.sendRequest(username);
+    ElMessage.success(`Friend request sent to ${username}.`);
+    addFriendUsername.value = "";
+    addContactDialogVisible.value = false;
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || "Failed to send friend request.");
   }
-};
-
-const sendFriendRequest = (user) => {
-  console.log(`Sending friend request to ${user.nickname}`);
-  user.requestSent = true; // 更新UI
-  ElNotification({
-    title: 'Success',
-    message: `Friend request sent to ${user.nickname}.`,
-    type: 'success',
-  });
 };
 
 const handleContactCommand = (command) => {
@@ -375,7 +361,7 @@ const handleContactCommand = (command) => {
   }
 };
 
-const handleDeleteContact = (contactToDelete) => {
+const handleDeleteContact = async (contactToDelete) => {
   ElMessageBox.confirm(
     `Are you sure you want to delete ${contactToDelete.nickname} from your contacts?`,
     'Confirm Deletion',
@@ -384,17 +370,16 @@ const handleDeleteContact = (contactToDelete) => {
       cancelButtonText: 'Cancel',
       type: 'warning',
     }
-  ).then(() => {
-    // 从联系人列表中移除
-    contactList.value = contactList.value.filter(c => c.id !== contactToDelete.id);
-    // 从黑名单中移除（如果存在）
-    blockedUsers.value.delete(contactToDelete.id);
-
+  ).then(async () => {
+    // 调用后端API
+    await friendshipService.unfriend(contactToDelete.username);
+    // 刷新数据
+    await refreshFriendData();
+    // 如果当前聊天对象被删，清空聊天
     if (currentChatTarget.value?.id === contactToDelete.id) {
       currentChatTarget.value = null;
       messages.value = [];
     }
-
     ElMessage({ type: 'success', message: `${contactToDelete.nickname} has been deleted.` });
   }).catch(() => {});
 };
@@ -404,10 +389,10 @@ const isBlocked = (userId) => {
   return blockedUsers.value.has(userId);
 };
 
-const handleBlockContact = (userToBlock) => {
-  blockedUsers.value.add(userToBlock.id);
+const handleBlockContact = async (userToBlock) => {
+  await friendshipService.blockUser(userToBlock.username);
   ElMessage({ type: 'warning', message: `${userToBlock.nickname} has been blocked.` });
-
+  await refreshFriendData();
   // 如果正在与该用户聊天，则添加系统消息
   if (currentChatTarget.value?.id === userToBlock.id) {
     messages.value.push({
@@ -419,10 +404,10 @@ const handleBlockContact = (userToBlock) => {
   }
 };
 
-const handleUnblockContact = (userToUnblock) => {
-  blockedUsers.value.delete(userToUnblock.id);
+const handleUnblockContact = async (userToUnblock) => {
+  await friendshipService.unblockUser(userToUnblock.username);
   ElMessage({ type: 'success', message: `${userToUnblock.nickname} has been unblocked.` });
-
+  await refreshFriendData();
   // 如果正在与该用户聊天，则添加系统消息
   if (currentChatTarget.value?.id === userToUnblock.id) {
     messages.value.push({
@@ -432,6 +417,59 @@ const handleUnblockContact = (userToUnblock) => {
     });
     scrollToBottom();
   }
+};
+
+const openFriendRequestsDialog = () => {
+  friendRequestsDialogVisible.value = true;
+};
+
+const refreshFriendData = async () => {
+  try {
+    const res = await friendshipService.getMyFriends();
+    contactList.value = res.data;
+    // 更新 blockedUsers
+    blockedUsers.value = new Set(res.data.filter(u => u.status === 'BLOCKED').map(u => u.id));
+    // 关键：同步 currentChatTarget 的最新状态
+    if (currentChatTarget.value) {
+      const updated = res.data.find(u => u.id === currentChatTarget.value.id);
+      if (updated) {
+        currentChatTarget.value = updated;
+      }
+    }
+  } catch {
+    contactList.value = [];
+    blockedUsers.value = new Set();
+  }
+  try {
+    const reqRes = await friendshipService.getPendingRequests();
+    friendRequests.value = reqRes.data;
+  } catch {
+    friendRequests.value = [];
+  }
+};
+
+const handleAcceptRequest = async (req) => {
+  await friendshipService.acceptRequest(req.username);
+  ElMessage.success('Friend request accepted!');
+  await refreshFriendData();
+};
+
+const handleDeclineRequest = async (req) => {
+  await friendshipService.declineRequest(req.username);
+  ElMessage.success('Friend request declined!');
+  await refreshFriendData();
+};
+
+const handleDeleteRequest = async (req) => {
+  await friendshipService.declineRequest(req.username); // 如果没有单独 delete API
+  ElMessage.success('Deleted!');
+  await refreshFriendData();
+};
+
+const handleBlockRequest = async (req) => {
+  await friendshipService.blockUser(req.username);
+  ElMessage.success('Blocked!');
+  await refreshFriendData();
 };
 
 const scrollToBottom = () => {
@@ -557,5 +595,22 @@ const scrollToBottom = () => {
   color: #b0b4ba;
   text-align: center;
   padding: 16px 0;
+}
+
+/* --- Friend Request Dialog --- */
+.friend-request-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.friend-request-item:last-child {
+  border-bottom: none;
+}
+.request-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
 }
 </style>
