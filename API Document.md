@@ -270,7 +270,174 @@ These are the primary data transfer objects used in the API.
     *   **Body:** `List<MessageResponse>` (An array of message objects)
 *   **Error Responses:**
     *   `401 Unauthorized`: If not authenticated.
+
+### 5.4. Friendships
+
+> All endpoints in this section require authentication.
+
+#### **Send Friend Request**
+*   **Endpoint:** `POST /api/friendships/requests`
+*   **Description:** Sends a friend request to another user.
+*   **Request Body:** 
+    ```json
+    {
+      "addresseeUsername": "string"
+    }
+    ```
+*   **Success Response:**
+    *   **Code:** `201 Created`
+    *   **Body:** 
+    ```json
+    {
+      "message": "Friend request sent successfully."
+    }
+    ```
+*   **Error Responses:**
+    *   `401 Unauthorized`: If not authenticated.
+
 ---
+#### **Accept Friend Request**
+*   **Endpoint:** `PUT /api/friendships/requests/accept`
+*   **Description:** Accepts a friend request from another user.
+*   **Request Body:** 
+    ```json
+    {
+      "username": "string (requester's username)"
+    }
+    ```
+*   **Success Response:**
+    *   **Code:** `200 OK`
+    *   **Body:** 
+    ```json
+    {
+      "message": "Friend request from {username} accepted.",
+      "status": "ACCEPTED"
+    }
+    ```
+*   **Error Responses:**
+    *   `401 Unauthorized`: If not authenticated.
+
+---
+#### **Decline Friend Request**
+*   **Endpoint:** `PUT /api/friendships/requests/decline`
+*   **Description:** Declines a friend request from another user.
+*   **Request Body:** 
+    ```json
+    {
+      "username": "string (requester's username)"
+    }
+    ```
+*   **Success Response:**
+    *   **Code:** `200 OK`
+    *   **Body:** 
+    ```json
+    {
+      "message": "Friend request from {username} declined.",
+      "status": "DECLINED"
+    }
+    ```
+*   **Error Responses:**
+    *   `401 Unauthorized`: If not authenticated.
+
+---
+#### **Get Friend List**
+*   **Endpoint:** `GET /api/friendships/my-friends`
+*   **Description:** Retrieves the list of friends for the authenticated user.
+*   **Success Response:**
+    *   **Code:** `200 OK`
+    *   **Body:** 
+    ```json
+    [
+      {
+        "id": "integer",
+        "username": "string",
+        "nickname": "string"
+      }
+    ]
+    ```
+*   **Error Responses:**
+    *   `401 Unauthorized`: If not authenticated.
+
+---
+#### **Unfriend a User**
+*   **Endpoint:** `DELETE /api/friendships/unfriend`
+*   **Description:** Removes a user from the authenticated user's friend list.
+*   **Request Body:** 
+    ```json
+    {
+      "username": "string (friend's username)"
+    }
+    ```
+*   **Success Response:**
+    *   **Code:** `200 OK`
+    *   **Body:** 
+    ```json
+    {
+      "message": "Friend '{username}' removed successfully."
+    }
+    ```
+*   **Error Responses:**
+    *   `401 Unauthorized`: If not authenticated.
+
+---
+#### **Block a User**
+*   **Endpoint:** `POST /api/friendships/block`
+*   **Description:** Blocks a user from interacting with the authenticated user.
+*   **Request Body:** 
+    ```json
+    {
+      "username": "string (user to block)"
+    }
+    ```
+*   **Success Response:**
+    *   **Code:** `200 OK`
+    *   **Body:** 
+    ```json
+    {
+      "message": "User '{username}' has been blocked."
+    }
+    ```
+*   **Error Responses:**
+    *   `401 Unauthorized`: If not authenticated.
+
+---
+#### **Unblock a User**
+*   **Endpoint:** `POST /api/friendships/unblock`
+*   **Description:** Unblocks a previously blocked user.
+*   **Request Body:** 
+    ```json
+    {
+      "username": "string (user to unblock)"
+    }
+    ```
+*   **Success Response:**
+    *   **Code:** `200 OK`
+    *   **Body:** `"Successfully unblocked user: {username}"`
+*   **Error Responses:**
+    *   `401 Unauthorized`: If not authenticated.
+
+### 5.5. File Handling
+
+> All endpoints in this section require authentication.
+
+#### **Upload a File**
+*   **Endpoint:** `POST /api/files/upload`
+*   **Description:** Uploads a file, which can then be sent as a message.
+*   **Request:** `multipart/form-data` with a `file` part.
+*   **Success Response:**
+    *   **Code:** `200 OK`
+    *   **Body:** 
+    ```json
+    {
+      "fileName": "string",
+      "fileUrl": "string",
+      "originalFilename": "string",
+      "fileType": "string",
+      "size": "long"
+    }
+    ```
+*   **Error Responses:**
+    *   `401 Unauthorized`: If not authenticated.
 
 ## 6. WebSocket API (Real-time Messaging)
 
@@ -290,5 +457,4 @@ Once connected, the client subscribes to a private queue to receive direct messa
 *   **Received Message Body:** `MessageResponse` (same as the REST API response)
 
 ### 6.3. Sending Messages
-The WebSocket API does not currently have a public endpoint for sending messages in this design. Sending is handled via the `POST /api/messages` REST endpoint, and the server then pushes
-
+The WebSocket API does not currently have a public endpoint for sending messages in this design. Sending is handled via the `POST /api/messages` REST endpoint, and the server then pushes the message to the recipient's WebSocket queue.

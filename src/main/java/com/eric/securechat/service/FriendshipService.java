@@ -5,6 +5,7 @@ import com.eric.securechat.model.Friendship;
 import com.eric.securechat.model.User;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface FriendshipService {
 
@@ -50,4 +51,13 @@ public interface FriendshipService {
      * @throws Exception 如果关系不存在、状态不正确或无权操作
      */
     Friendship unblockUser(String currentUserUsername, String blockedUsername) throws Exception;
+
+    /**
+     * [工具方法] 查找两个用户之间的好友关系，不关心方向。
+     * 可供其他服务（如MessageService）调用来验证关系。
+     * @param user1 第一个用户
+     * @param user2 第二个用户
+     * @return 包含 Friendship 的 Optional, 如果不存在任何关系则为空
+     */
+    Optional<Friendship> findFriendshipRelation(User user1, User user2);
 }

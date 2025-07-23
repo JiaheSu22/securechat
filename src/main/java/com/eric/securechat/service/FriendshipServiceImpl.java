@@ -281,13 +281,15 @@ public class FriendshipServiceImpl implements FriendshipService {
     }
 
     /**
-     * [辅助方法] 查找两个用户之间的好友关系，不关心方向。
+     * 查找两个用户之间的好友关系，不关心方向。
      * 核心重构方法，利用 Repository 中已有的 @Query 方法。
      * @param user1 第一个用户
      * @param user2 第二个用户
      * @return 包含 Friendship 的 Optional
      */
-    private Optional<Friendship> findFriendshipRelation(User user1, User user2) {
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Friendship> findFriendshipRelation(User user1, User user2) {
         // 直接调用 Repository 中已经定义好的双向查询方法
         return friendshipRepository.findFriendshipBetweenUsers(user1, user2);
     }

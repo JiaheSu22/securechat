@@ -107,6 +107,13 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>org.modelmapper</groupId>
+            <artifactId>modelmapper</artifactId>
+            <version>3.1.1</version> <!-- 你可以使用最新的版本 -->
+        </dependency>
+
+
 
         <!-- Testing dependencies -->
         <dependency>
