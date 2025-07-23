@@ -10,6 +10,7 @@ public record FriendStatusDto(
         UUID id,
         String username,
         String nickname,
-        FriendshipStatus status
+        FriendshipStatus status,
+        String publicKey
 ) {
 }

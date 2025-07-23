@@ -43,7 +43,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(unauthorizedHandler) // <-- 在这里配置！
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll() // Allow auth endpoints
+                        .requestMatchers("/api/auth/**", "/ws").permitAll() // Allow auth endpoints
                         .anyRequest().authenticated() // Secure all other endpoints
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -108,11 +108,15 @@
             placeholder="Type your message here..."
             :autosize="{ minRows: 1, maxRows: 4 }"
             @keydown.enter.prevent="handleEnterKey"
-            :disabled="isChatBlocked"
+            :disabled="isChatBlocked || !canSendMessage"
             resize="none"
             class="chat-textarea"
           />
-          <el-button :icon="Promotion" type="primary" @click="handleSend" :disabled="isChatBlocked" class="input-action-btn">Send</el-button>
+          <el-button :icon="Promotion" type="primary" @click="handleSend" :disabled="isChatBlocked || !canSendMessage" class="input-action-btn">Send</el-button>
+        </div>
+        <div v-if="currentChatTarget && !canSendMessage" class="input-warning">
+          <el-icon color="#F56C6C"><Lock /></el-icon>
+          <span>对方未上传公钥，无法发送消息</span>
         </div>
       </template>
       <template v-else>
@@ -170,6 +174,14 @@ import { ElMessageBox, ElNotification, ElMessage } from 'element-plus';
 // *** FIX: 引入所需图标 ***
 import { Promotion, Search, Paperclip, Plus, MoreFilled, Delete, Bell, Lock, CircleClose, SuccessFilled } from '@element-plus/icons-vue';
 import { friendshipService } from '@/services/friendshipService';
+// 新增：引入 STOMP 客户端
+import { Client } from '@stomp/stompjs';
+// 新增：引入加密工具
+import { encryptMessage } from '@/services/crypto';
+// 新增：引入解密工具
+import { decryptMessage } from '@/services/crypto';
+// 新增：引入消息服务
+import { messageService } from '@/services/messageService';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -183,6 +195,7 @@ const messageContainerRef = ref(null);
 const searchQuery = ref('');
 const blockedUsers = ref(new Set()); // 新增：用于存储被拉黑的用户ID
 const friendRequests = ref([]);
+const friendPublicKeys = ref(new Map()); // 新增：缓存 username -> publicKey
 
 // --- 好友管理状态 ---
 const addContactDialogVisible = ref(false);
@@ -202,6 +215,13 @@ const isChatBlocked = computed(() => {
   return currentChatTarget.value?.status === 'BLOCKED';
 });
 
+const canSendMessage = computed(() => {
+  if (!currentChatTarget.value) return false;
+  if (isChatBlocked.value) return false;
+  const publicKey = friendPublicKeys.value.get(currentChatTarget.value.username);
+  return !!publicKey;
+});
+
 // --- 颜色池和头像颜色 ---
 const colorPool = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FED766', '#9B59B6', '#F39C12', '#1ABC9C', '#3498DB'];
 const getAvatarColor = (user) => {
@@ -215,6 +235,69 @@ const getAvatarColor = (user) => {
   return colorPool[Math.abs(hash) % colorPool.length];
 };
 
+const stompClient = ref(null); // 保存 STOMP 客户端实例
+const isSocketConnected = ref(false);
+
+// --- WebSocket 连接与订阅 ---
+const connectWebSocket = () => {
+  const token = localStorage.getItem('token');
+  if (stompClient.value && stompClient.value.connected) return;
+  const client = new Client({
+    brokerURL: `ws://localhost:8080/ws?token=${token}`,
+    reconnectDelay: 5000,
+    onConnect: () => {
+      isSocketConnected.value = true;
+      // 订阅个人消息队列
+      client.subscribe('/user/queue/private', (message) => {
+        // 新增：解析消息并解密
+        try {
+          const msgObj = JSON.parse(message.body);
+          // 只处理当前聊天对象的消息
+          if (!currentChatTarget.value || msgObj.senderUsername !== currentChatTarget.value.username) {
+            // 可选：可做未读消息提醒
+            return;
+          }
+          const privateKey = authStore.privateKey;
+          let decrypted = null;
+          if (privateKey) {
+            decrypted = decryptMessage(privateKey, msgObj.encryptedContent);
+          }
+          if (decrypted) {
+            messages.value.push({
+              id: msgObj.id,
+              text: decrypted,
+              sender: msgObj.senderUsername,
+            });
+          } else {
+            messages.value.push({
+              id: msgObj.id,
+              text: '[解密失败] 此消息无法读取',
+              sender: 'system',
+              encrypted: false
+            });
+          }
+          scrollToBottom();
+        } catch (e) {
+          messages.value.push({
+            id: Date.now(),
+            text: '[消息处理异常]',
+            sender: 'system',
+            encrypted: false
+          });
+        }
+      });
+    },
+    onDisconnect: () => {
+      isSocketConnected.value = false;
+    },
+    onStompError: (frame) => {
+      console.error('STOMP error:', frame.headers['message'], frame.body);
+    },
+  });
+  client.activate();
+  stompClient.value = client;
+};
+
 // --- 生命周期钩子 ---
 onMounted(async () => {
   if (authStore.isAuthenticated) {
@@ -223,8 +306,15 @@ onMounted(async () => {
       const res = await friendshipService.getMyFriends();
       contactList.value = res.data;
       blockedUsers.value = new Set(contactList.value.filter(u => u.status === 'BLOCKED').map(u => u.id));
+      // 新增：缓存好友公钥
+      const keyMap = new Map();
+      for (const user of res.data) {
+        keyMap.set(user.username, user.publicKey);
+      }
+      friendPublicKeys.value = keyMap;
     } catch (e) {
       contactList.value = [];
+      friendPublicKeys.value = new Map();
     }
     // 获取好友请求
     try {
@@ -233,6 +323,7 @@ onMounted(async () => {
     } catch (e) {
       friendRequests.value = [];
     }
+    connectWebSocket(); // 新增：建立 WebSocket 连接
   }
 });
 
@@ -285,27 +376,45 @@ const handleEnterKey = (event) => {
   }
 };
 
-const handleSend = () => {
+const handleSend = async () => {
   if (newMessage.value.trim() === '' || !currentChatTarget.value || isChatBlocked.value) return;
 
-  messages.value.push({
-    id: Date.now(),
-    text: newMessage.value,
-    sender: authStore.user.username,
-  });
+  // 查找公钥
+  const targetUsername = currentChatTarget.value.username;
+  const publicKey = friendPublicKeys.value.get(targetUsername);
+  if (!publicKey) {
+    ElMessage.error('You cannot send an encrypted message to a user who has not uploaded a public key.');
+    return;
+  }
 
-  const sentMessage = newMessage.value;
-  newMessage.value = '';
-  scrollToBottom();
+  // 加密消息
+  const encrypted = encryptMessage(publicKey, newMessage.value);
+  if (!encrypted) {
+    ElMessage.error('Encryption failed, message not sent.');
+    return;
+  }
 
-  setTimeout(() => {
-    messages.value.push({
-      id: Date.now() + 1,
-      text: `Okay, I received: "${sentMessage}"`,
-      sender: currentChatTarget.value.username,
+  // 发送到后端
+  try {
+    const res = await messageService.sendMessage({
+      receiverUsername: targetUsername,
+      encryptedContent: encrypted,
+      messageType: 'TEXT',
     });
+    // 用后端返回的消息插入本地消息列表（保证 id、时间等一致）
+    const msg = res.data;
+    messages.value.push({
+      id: msg.id,
+      text: newMessage.value, // 本地显示明文
+      sender: authStore.user.username,
+      timestamp: msg.timestamp,
+      encrypted: true
+    });
+    newMessage.value = '';
     scrollToBottom();
-  }, 1000);
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || 'Message sending failed.');
+  }
 };
 
 const getMessageClass = (sender) => {
@@ -436,9 +545,16 @@ const refreshFriendData = async () => {
         currentChatTarget.value = updated;
       }
     }
+    // 新增：同步 friendPublicKeys
+    const keyMap = new Map();
+    for (const user of res.data) {
+      keyMap.set(user.username, user.publicKey);
+    }
+    friendPublicKeys.value = keyMap;
   } catch {
     contactList.value = [];
     blockedUsers.value = new Set();
+    friendPublicKeys.value = new Map();
   }
   try {
     const reqRes = await friendshipService.getPendingRequests();
@@ -612,5 +728,13 @@ const scrollToBottom = () => {
   margin-left: auto;
   display: flex;
   gap: 8px;
+}
+.input-warning {
+  display: flex;
+  align-items: center;
+  color: #F56C6C;
+  font-size: 14px;
+  margin: 8px 0 0 0;
+  gap: 6px;
 }
 </style>

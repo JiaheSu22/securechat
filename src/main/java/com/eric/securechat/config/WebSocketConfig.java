@@ -5,10 +5,26 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.http.server.ServerHttpResponse;
+import org.springframework.web.socket.WebSocketHandler;
+import org.springframework.web.socket.server.HandshakeInterceptor;
+import org.springframework.stereotype.Component;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.util.Map;
+import com.eric.securechat.security.JwtHandshakeInterceptor;
 
 @Configuration
 @EnableWebSocketMessageBroker // 开启WebSocket消息代理功能
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private final JwtHandshakeInterceptor jwtHandshakeInterceptor;
+
+    public WebSocketConfig(JwtHandshakeInterceptor jwtHandshakeInterceptor) {
+        this.jwtHandshakeInterceptor = jwtHandshakeInterceptor;
+    }
 
     /**
      * 配置消息代理 (Message Broker)
@@ -46,7 +62,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         //    如果浏览器不支持WebSocket，它会使用SockJS（一个JavaScript库）来模拟一个类似WebSocket的连接。
         //    这大大提高了浏览器的兼容性。
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*"); // 在开发阶段允许所有来源，生产环境应配置得更严格
-                //.withSockJS();
+                .setAllowedOriginPatterns("*") // 在开发阶段允许所有来源，生产环境应配置得更严格
+                .addInterceptors(jwtHandshakeInterceptor); // 这里注入你的拦截器
+
     }
 }

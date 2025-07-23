@@ -3,6 +3,7 @@ package com.eric.securechat.service;
 import com.eric.securechat.dto.MessageResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -10,25 +11,25 @@ public class WebSocketService {
 
     private static final Logger logger = LoggerFactory.getLogger(WebSocketService.class);
 
-    // 这是一个占位符实现。
-    // 在未来的步骤中，我们将注入 SimpMessagingTemplate 来真正发送消息。
-    // private final SimpMessagingTemplate messagingTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    // public WebSocketService(SimpMessagingTemplate messagingTemplate) {
-    //     this.messagingTemplate = messagingTemplate;
-    // }
+    public WebSocketService(SimpMessagingTemplate messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
+    }
 
     /**
-     * Notifies a specific user about a new message.
-     * Currently, this is a placeholder and only logs the action.
+     * Notifies a specific user about a new message by sending it over WebSocket.
      *
-     * @param username The user to notify.
+     * @param username The username of the recipient.
      * @param message  The message DTO to send.
      */
     public void notifyUser(String username, MessageResponse message) {
-        // TODO: Implement actual WebSocket message sending logic.
-        // Example: messagingTemplate.convertAndSendToUser(username, "/queue/messages", message);
+        // The destination is "/queue/private". Spring prepends "/user/{username}" automatically.
+        // So the message is sent to a user-specific destination like "/user/bob/queue/private".
+        // The client must be subscribed to "/user/queue/private" to receive it.
+        String destination = "/queue/private";
+        messagingTemplate.convertAndSendToUser(username, destination, message);
 
-        logger.info("[WebSocket Placeholder] Pretending to send a notification to user: {}. Message content: {}", username, message);
+        logger.info("Sent message via WebSocket to user: '{}' at destination '{}'", username, destination);
     }
 }
