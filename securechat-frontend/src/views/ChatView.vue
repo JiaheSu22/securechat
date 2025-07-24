@@ -76,6 +76,24 @@
             </el-dropdown>
           </div>
         </div>
+        <!-- 新增：密钥管理按钮区 -->
+        <div class="key-actions-bar" style="display: flex; justify-content: center; gap: 12px; margin: 16px 0 24px 0; padding-bottom: 16px;">
+          <el-tooltip content="Export Private Key" placement="top">
+            <el-button :icon="Download" circle size="small" @click="showExportDialog = true" />
+          </el-tooltip>
+          <el-tooltip content="Import Private Key" placement="top">
+            <el-button :icon="Upload" circle size="small" @click="showImportDialog = true" />
+          </el-tooltip>
+        </div>
+        <el-dialog v-model="showExportDialog" title="Export Private Key" width="400px">
+          <el-input type="textarea" :rows="6" :value="exportPrivateKeys()" readonly style="margin-bottom: 10px;" />
+          <el-button type="primary" @click="copyToClipboard(exportPrivateKeys())">Copy</el-button>
+          <el-button type="info" @click="downloadAsFile(exportPrivateKeys())">Download as File</el-button>
+        </el-dialog>
+        <el-dialog v-model="showImportDialog" title="Import Private Key" width="400px">
+          <el-input type="textarea" v-model="importKeyStr" :rows="6" placeholder="Paste your private key JSON here" style="margin-bottom: 10px;" />
+          <el-button type="success" @click="importPrivateKeys(importKeyStr)">Import</el-button>
+        </el-dialog>
       </div>
     </div>
 
@@ -87,48 +105,50 @@
             <span>{{ currentChatTarget.nickname }}</span>
             <span class="chat-subtitle">@{{ currentChatTarget.username }}</span>
           </div>
-          <div class="key-actions" style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: flex; gap: 8px;">
-            <el-tooltip content="Export Private Key" placement="bottom">
-              <el-button :icon="Download" circle size="small" @click="showExportDialog = true" />
-            </el-tooltip>
-            <el-tooltip content="Import Private Key" placement="bottom">
-              <el-button :icon="Upload" circle size="small" @click="showImportDialog = true" />
-            </el-tooltip>
-          </div>
-          <el-dialog v-model="showExportDialog" title="Export Private Key" width="400px">
-            <el-input type="textarea" :rows="6" :value="exportPrivateKeys()" readonly style="margin-bottom: 10px;" />
-            <el-button type="primary" @click="copyToClipboard(exportPrivateKeys())">Copy</el-button>
-            <el-button type="info" @click="downloadAsFile(exportPrivateKeys())">Download as File</el-button>
-          </el-dialog>
-          <el-dialog v-model="showImportDialog" title="Import Private Key" width="400px">
-            <el-input type="textarea" v-model="importKeyStr" :rows="6" placeholder="Paste your private key JSON here" style="margin-bottom: 10px;" />
-            <el-button type="success" @click="importPrivateKeys(importKeyStr)">Import</el-button>
-          </el-dialog>
         </div>
         <div ref="messageContainerRef" class="message-container">
           <!-- 消息渲染 -->
           <div v-for="msg in messages" :key="msg.id" :class="['message-row', getMessageClass(msg.sender)]">
+            <!-- 系统消息 -->
             <div v-if="msg.sender === 'system'" class="system-message">
               <el-icon v-if="msg.encrypted"><Lock /></el-icon>
               <span :class="{ 'encrypted-text': msg.encrypted }">{{ msg.text }}</span>
             </div>
-            <div v-else-if="msg.fileUrl" class="message-bubble">
-              <p>
-                <el-icon><Paperclip /></el-icon>
-                <span>{{ msg.originalFilename || 'Encrypted File' }}</span>
-                <el-button size="small" type="primary" @click="downloadAndDecryptFile(msg.fileUrl, msg.nonce, sessionKeyMap.value[msg.sender === authStore.user.username ? currentChatTarget.value.username : msg.sender], msg.originalFilename)">Download</el-button>
-              </p>
-            </div>
-            <div v-else class="message-bubble">
-              <p>{{ msg.text }}</p>
+
+            <!-- 用户消息 -->
+            <div v-else class="message-bubble" style="position: relative;">
+              <div v-if="msg.messageType === 'FILE'">
+                <div class="file-message-content" style="display: flex; align-items: center;">
+                  <el-icon :size="24" style="margin-right: 8px;"><Document /></el-icon>
+                  <div class="file-info">
+                    <span class="file-name">{{ msg.originalFilename }}</span>
+                  </div>
+                </div>
+                <!-- 下载图标按钮，气泡外右侧/左侧 -->
+                <el-button
+                  :icon="Download"
+                  circle
+                  size="small"
+                  class="file-download-btn"
+                  @click="handleFileDownload(msg)"
+                  :style="getDownloadBtnStyle(msg)"
+                  :title="'Download'"
+                />
+              </div>
+              <p v-else>{{ msg.text }}</p>
             </div>
           </div>
         </div>
         <div class="message-input-box">
           <el-tooltip effect="dark" content="Send File" placement="top">
-            <el-button :icon="Paperclip" @click="() => $refs.fileInput.click()" class="input-action-btn" />
+            <el-button :icon="Paperclip" @click="handleAttachFile" class="input-action-btn" />
           </el-tooltip>
           <input type="file" ref="fileInput" style="display:none" @change="onFileChange" />
+          <div v-if="selectedFile" class="file-attachment-bubble">
+            <span class="remove-attachment" @click="selectedFile = null">×</span>
+            <el-icon><Paperclip /></el-icon>
+            <span class="file-name">{{ selectedFile.name }}</span>
+          </div>
           <el-input
             v-model="newMessage"
             type="textarea"
@@ -195,7 +215,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { ElMessageBox, ElNotification, ElMessage } from 'element-plus';
 // *** FIX: 引入所需图标 ***
-import { Promotion, Search, Paperclip, Plus, MoreFilled, Delete, Bell, Lock, CircleClose, SuccessFilled, Download, Upload } from '@element-plus/icons-vue';
+import { Promotion, Search, Paperclip, Plus, MoreFilled, Delete, Bell, Lock, CircleClose, SuccessFilled, Download, Upload, Document } from '@element-plus/icons-vue';
 import { friendshipService } from '@/services/friendshipService';
 // 新增：引入 STOMP 客户端
 import { Client } from '@stomp/stompjs';
@@ -206,6 +226,7 @@ import sodium from 'libsodium-wrappers'
 // import { decryptMessage } from '@/services/crypto'; // 删除此行，避免重复声明
 // 新增：引入消息服务
 import { messageService } from '@/services/messageService';
+import { fileService } from '@/services/fileService';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -233,6 +254,10 @@ const friendRequestsDialogVisible = ref(false);
 const showExportDialog = ref(false);
 const showImportDialog = ref(false);
 const importKeyStr = ref('');
+
+// --- 文件附件状态 ---
+const selectedFile = ref(null);
+const fileInput = ref(null);
 
 // --- 计算属性 ---
 const filteredContactList = computed(() => {
@@ -279,14 +304,12 @@ const connectWebSocket = () => {
       isSocketConnected.value = true;
       // 订阅个人消息队列
       client.subscribe('/user/queue/private', async (message) => {
-        // 新增：解析消息并解密
         try {
           const msgObj = JSON.parse(message.body);
+          console.log('收到 WebSocket 消息体:', msgObj);
           // 只处理当前聊天对象的消息
           if (!currentChatTarget.value || msgObj.senderUsername !== currentChatTarget.value.username) {
-            // 不是当前聊天对象，做未读标记
             unreadMap.value[msgObj.senderUsername] = (unreadMap.value[msgObj.senderUsername] || 0) + 1;
-            // 可选：弹窗通知
             ElNotification({
               title: 'New Message',
               message: `From ${msgObj.senderUsername}`,
@@ -296,21 +319,31 @@ const connectWebSocket = () => {
           }
           const sessionKey = sessionKeyMap.value[msgObj.senderUsername];
           let text = '[Decryption Failed]';
-          if (sessionKey) {
-            console.log('Decryption Parameters (Real-time Message)', {
-              sessionKey,
-              nonce: msgObj.nonce,
-              encryptedContent: msgObj.encryptedContent,
-              sender: msgObj.senderUsername,
-              currentUser: authStore.user.username
-            });
-            text = await decryptMessage(sessionKey, msgObj.nonce, msgObj.encryptedContent);
-            if (!text) text = '[Decryption Failed]';
+          if (msgObj.messageType === 'TEXT') {
+            if (sessionKey) {
+              console.log('Decryption Parameters (Real-time Message)', {
+                sessionKey,
+                nonce: msgObj.nonce,
+                encryptedContent: msgObj.encryptedContent,
+                sender: msgObj.senderUsername,
+                currentUser: authStore.user.username
+              });
+              text = await decryptMessage(sessionKey, msgObj.nonce, msgObj.encryptedContent);
+              if (!text) text = '[Decryption Failed]';
+            }
+          } else if (msgObj.messageType === 'FILE') {
+            text = msgObj.encryptedContent; // 文件消息直接显示描述
           }
           messages.value.push({
             id: msgObj.id,
             text,
             sender: msgObj.senderUsername,
+            messageType: msgObj.messageType,
+            fileUrl: msgObj.fileUrl,
+            originalFilename: msgObj.originalFilename,
+            nonce: msgObj.nonce,
+            timestamp: msgObj.timestamp,
+            encrypted: true
           });
           scrollToBottom();
         } catch (e) {
@@ -396,21 +429,29 @@ const selectChat = async (user) => {
     const res = await messageService.getConversation(user.username);
     for (const msg of res.data) {
       let text = '[Decryption Failed]';
-      if (sessionKey) {
-        console.log('Decryption Parameters (Historical Messages)', {
-          sessionKey,
-          nonce: msg.nonce,
-          encryptedContent: msg.encryptedContent,
-          sender: msg.senderUsername,
-          currentUser: authStore.user.username
-        });
-        text = await decryptMessage(sessionKey, msg.nonce, msg.encryptedContent);
-        if (!text) text = '[Decryption Failed]';
+      if (msg.messageType === 'TEXT') {
+        if (sessionKey) {
+          console.log('Decryption Parameters (Historical Messages)', {
+            sessionKey,
+            nonce: msg.nonce,
+            encryptedContent: msg.encryptedContent,
+            sender: msg.senderUsername,
+            currentUser: authStore.user.username
+          });
+          text = await decryptMessage(sessionKey, msg.nonce, msg.encryptedContent);
+          if (!text) text = '[Decryption Failed]';
+        }
+      } else if (msg.messageType === 'FILE') {
+        text = msg.encryptedContent; // 文件消息直接显示描述
       }
       messages.value.push({
         id: msg.id,
         text,
         sender: msg.senderUsername,
+        messageType: msg.messageType,
+        fileUrl: msg.fileUrl,
+        originalFilename: msg.originalFilename,
+        nonce: msg.nonce,
         timestamp: msg.timestamp,
         encrypted: true
       });
@@ -448,6 +489,41 @@ const handleEnterKey = (event) => {
 };
 
 const handleSend = async () => {
+  if (selectedFile.value) {
+    // 发送文件消息
+    const sessionKey = sessionKeyMap.value[currentChatTarget.value.username];
+    if (!sessionKey) {
+      ElMessage.error('Key negotiation failed, cannot send file');
+      return;
+    }
+    const { encryptedBlob, nonce } = await encryptFile(selectedFile.value, sessionKey);
+    const uploadRes = await uploadEncryptedFile(encryptedBlob, selectedFile.value.name);
+    await messageService.sendMessage({
+      receiverUsername: currentChatTarget.value.username,
+      messageType: 'FILE',
+      fileUrl: uploadRes.fileUrl,
+      originalFilename: selectedFile.value.name,
+      encryptedContent: newMessage.value || '[File Encrypted]', // 文件描述
+      nonce
+    });
+    ElMessage.success('File encrypted and sent');
+    // 文件发送成功后
+    messages.value.push({
+      id: uploadRes.id || Date.now(), // 用后端返回的id或本地时间戳
+      text: newMessage.value || '[File Encrypted]',
+      sender: authStore.user.username,
+      messageType: 'FILE',
+      fileUrl: uploadRes.fileUrl,
+      originalFilename: selectedFile.value.name,
+      nonce,
+      timestamp: new Date().toISOString(),
+      encrypted: true
+    });
+    selectedFile.value = null;
+    newMessage.value = '';
+    return;
+  }
+  // 发送文本消息
   if (newMessage.value.trim() === '' || !currentChatTarget.value) return;
   const sessionKey = sessionKeyMap.value[currentChatTarget.value.username];
   if (!sessionKey) {
@@ -496,7 +572,7 @@ const handleLogout = () => {
 };
 
 const handleAttachFile = () => {
-  ElNotification({ title: 'Feature Hint', message: 'File attachment functionality is planned!', type: 'info' });
+  if (fileInput.value) fileInput.value.click();
 };
 
 // --- 好友管理方法 ---
@@ -757,33 +833,36 @@ async function handleSendFile(file) {
     messageType: 'FILE',
     fileUrl: uploadRes.fileUrl,
     originalFilename: file.name,
-    encryptedContent: '[File Encrypted]', // 可选，或加密文件描述
+    encryptedContent: newMessage.value || '[File Encrypted]', // 文件描述
     nonce
   });
   ElMessage.success('File encrypted and sent');
+  // 清空输入框和附件标识
+  selectedFile.value = null;
+  newMessage.value = '';
 }
 
-async function downloadAndDecryptFile(fileUrl, nonce, sessionKey, originalFilename) {
-  await sodium.ready;
-  // 1. 下载密文
-  const response = await fetch(fileUrl);
+async function handleFileDownload(msg) {
+  const token = localStorage.getItem('token');
+  const response = await fetch(msg.fileUrl, {
+    headers: { Authorization: 'Bearer ' + token }
+  });
   const cipherBuffer = await response.arrayBuffer();
+  await sodium.ready;
+  const nonceBytes = sodium.from_base64(msg.nonce, sodium.base64_variants.URLSAFE_NO_PADDING);
   const cipherBytes = new Uint8Array(cipherBuffer);
-  // 2. 解密
-  const nonceBytes = sodium.from_base64(nonce, sodium.base64_variants.URLSAFE_NO_PADDING);
+  // 这里要区分：自己发的用 currentChatTarget，收到的用 msg.senderUsername
+  const sessionKey = sessionKeyMap.value[
+    msg.sender === authStore.user.username ? currentChatTarget.value.username : msg.sender
+  ];
   const plainBytes = sodium.crypto_aead_chacha20poly1305_ietf_decrypt(
-    null,
-    cipherBytes,
-    null,
-    nonceBytes,
-    sessionKey
+    null, cipherBytes, null, nonceBytes, sessionKey
   );
-  // 3. 生成 Blob 并下载
   const blob = new Blob([plainBytes]);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = originalFilename;
+  a.download = msg.originalFilename;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -833,10 +912,49 @@ function onFileChange(e) {
       ElMessage.error('File size must not exceed 50MB');
       return;
     }
-    handleSendFile(file);
+    selectedFile.value = file; // 设置文件引用
+    newMessage.value = `[Attachment] ${file.name}`; // 设置文件描述
   }
   e.target.value = '';
 }
+
+// 新增：图片预览功能
+const previewImage = (url) => {
+  ElMessageBox.open({
+    title: 'Image Preview',
+    message: `<img src="${url}" style="max-width: 100%; max-height: 80vh; display: block; margin: 0 auto;" />`,
+    customClass: 'image-preview-dialog',
+    showConfirmButton: false,
+    showCancelButton: true,
+    cancelButtonText: 'Close',
+    confirmButtonText: 'Download',
+    confirmButtonClass: 'el-button--primary',
+    cancelButtonClass: 'el-button--danger',
+    beforeClose: (done, type) => {
+      if (type === 'cancel') {
+        done();
+      } else if (type === 'confirm') {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = url.substring(url.lastIndexOf('/') + 1);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        done();
+      }
+    }
+  });
+};
+
+function getDownloadBtnStyle(msg) {
+  // 自己发的放左侧，收到的放右侧
+  if (msg.sender === authStore.user.username) {
+    return 'position: absolute; left: -38px; top: 50%; transform: translateY(-50%);';
+  } else {
+    return 'position: absolute; right: -38px; top: 50%; transform: translateY(-50%);';
+  }
+}
+
 </script>
 
 <style scoped>
@@ -902,6 +1020,7 @@ function onFileChange(e) {
   justify-content: center;
   align-items: flex-end;
   gap: 10px;
+  position: relative; /* 让气泡绝对定位于输入框上方 */
 }
 .input-action-btn {
   align-self: flex-end;
@@ -951,7 +1070,7 @@ function onFileChange(e) {
 }
 .empty-results {
   color: #b0b4ba;
-  text-align: center;
+  text-align: center; 
   padding: 16px 0;
 }
 
@@ -1001,5 +1120,59 @@ function onFileChange(e) {
   transform: translateY(-50%);
   display: flex;
   gap: 8px;
+}
+
+/* 新增：图片预览弹窗样式 */
+.image-preview-dialog .el-message-box__content {
+  padding: 20px;
+}
+.image-preview-dialog .el-message-box__content img {
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+.image-preview-dialog .el-message-box__content .el-message-box__title {
+  text-align: left;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ebeef5;
+}
+.image-preview-dialog .el-message-box__content .el-message-box__message {
+  text-align: left;
+  padding-top: 10px;
+}
+.image-preview-dialog .el-message-box__content .el-message-box__btns {
+  justify-content: flex-start;
+}
+.image-preview-dialog .el-message-box__content .el-message-box__btns .el-button {
+  margin-left: 10px;
+}
+
+/* 新增：附件气泡样式 */
+.file-attachment-bubble {
+  display: inline-flex;
+  align-items: center;
+  background: #f3f6fa;
+  color: #333;
+  border-radius: 16px;
+  padding: 6px 16px 6px 10px;
+  margin-bottom: 6px;
+  position: absolute;
+  left: 20px;
+  top: -38px; /* 视输入框高度微调 */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  z-index: 10;
+}
+.remove-attachment {
+  color: #f56c6c;
+  font-weight: bold;
+  font-size: 16px;
+  margin-right: 8px;
+  cursor: pointer;
+  position: absolute;
+  left: 4px;
+  top: 2px;
+}
+.file-name {
+  font-weight: 500;
+  margin-left: 6px;
 }
 </style>

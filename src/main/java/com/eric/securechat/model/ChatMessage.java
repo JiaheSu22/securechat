@@ -1,32 +1,92 @@
 package com.eric.securechat.model;
 
+import java.time.Instant;
+
+/**
+ * Represents a message DTO (Data Transfer Object) for WebSocket communication.
+ * This class needs to accommodate both text and file messages.
+ */
 public class ChatMessage {
-    private String from; // Sender's username
-    private String to;   // Recipient's username
-    private String content; // The encrypted payload (as a JSON string or Base64)
+    // Renamed fields to match frontend payload for consistency
+    private String senderUsername; // Replaces 'from'
+    private String receiverUsername; // Replaces 'to'
+    private String encryptedContent; // Replaces 'content'
 
-    // Getters and setters
-    public String getFrom() {
-        return from;
+    // New fields to support file messages
+    private MessageType messageType; // Use an enum for type safety
+    private String fileUrl;
+    private String originalFilename;
+    private String nonce;
+    private Instant timestamp;
+
+    // Enum for message types
+    public enum MessageType {
+        TEXT, FILE
     }
 
-    public void setFrom(String from) {
-        this.from = from;
+    // Getters and Setters
+
+    public String getSenderUsername() {
+        return senderUsername;
     }
 
-    public String getTo() {
-        return to;
+    public void setSenderUsername(String senderUsername) {
+        this.senderUsername = senderUsername;
     }
 
-    public void setTo(String to) {
-        this.to = to;
+    public String getReceiverUsername() {
+        return receiverUsername;
     }
 
-    public String getContent() {
-        return content;
+    public void setReceiverUsername(String receiverUsername) {
+        this.receiverUsername = receiverUsername;
     }
 
-    public void setContent(String content) {
-        this.content = content;
+    public String getEncryptedContent() {
+        return encryptedContent;
+    }
+
+    public void setEncryptedContent(String encryptedContent) {
+        this.encryptedContent = encryptedContent;
+    }
+
+    public MessageType getMessageType() {
+        return messageType;
+    }
+
+    public void setMessageType(MessageType messageType) {
+        this.messageType = messageType;
+    }
+
+    public String getFileUrl() {
+        return fileUrl;
+    }
+
+    public void setFileUrl(String fileUrl) {
+        this.fileUrl = fileUrl;
+    }
+
+    public String getOriginalFilename() {
+        return originalFilename;
+    }
+
+    public void setOriginalFilename(String originalFilename) {
+        this.originalFilename = originalFilename;
+    }
+
+    public String getNonce() {
+        return nonce;
+    }
+
+    public void setNonce(String nonce) {
+        this.nonce = nonce;
+    }
+
+    public Instant getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(Instant timestamp) {
+        this.timestamp = timestamp;
     }
 }

@@ -20,13 +20,15 @@ public class ChatController {
         // We can use the 'Principal' object from the WebSocket session to securely identify the sender.
         // This prevents a client from spoofing the 'from' field.
         String senderUsername = principal.getName();
-        chatMessage.setFrom(senderUsername);
+        // Use the new setter to align with the updated ChatMessage class
+        chatMessage.setSenderUsername(senderUsername);
 
         // The destination for a specific user is typically "/user/{username}/queue/messages"
+        // Use the new getter for the recipient's username
         messagingTemplate.convertAndSendToUser(
-                chatMessage.getTo(),          // The recipient's username
-                "/queue/messages",            // The specific queue on that user's channel
-                chatMessage                   // The payload
+                chatMessage.getReceiverUsername(), // The recipient's username
+                "/queue/messages",                 // The specific queue on that user's channel
+                chatMessage                        // The payload
         );
     }
 }
