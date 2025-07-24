@@ -1,134 +1,135 @@
-# Diffie-Hellman Key Exchange (ECDH) Project
+# SecureChat
+
+A simple, full-stack secure messaging application featuring **end-to-end encryption (E2EE)**. SecureChat ensures that only you and your friends can read your messages—no one else, not even the server.
 
 ## Project Overview
 
-This project implements a secure communication system based on **Diffie-Hellman Key Exchange** (using **ECDH** algorithm). The system includes a backend service (using **Spring Boot 3**) and a frontend client (using **Vite** and **Vue 3**). The core functionality of the system is to generate a shared key via key exchange and use this shared key to encrypt and decrypt text messages and files (images/videos), ensuring the security of information during transmission.
+SecureChat is designed for privacy-first, real-time communication. It leverages strong cryptography in the browser and on the backend, with all encryption and decryption performed on the client side. The server never has access to your private keys or plaintext messages.
 
-## Tech Stack
-
-### Backend
-- **Spring Boot 3**: For building and running the backend service.
-- **Spring Security**: For authentication and authorization.
-- **Spring WebSocket**: For real-time bidirectional communication over WebSocket.
-- **JDK 17**: Java 17 as the development language and runtime environment.
-- **Maven**: For project building and dependency management.
-
-### Frontend
-- **Vite**: Fast build tool for frontend development and bundling.
-- **Vue 3**: For building the frontend UI and components.
-- **Web Crypto API**: Native browser cryptographic API for implementing ECDH key exchange and encryption/decryption operations.
-
-### Database
-- **MySQL** (for local development, optional in production): For storing user information and message records.
-
-### Key Exchange Algorithm
-- **ECDH** (Elliptic Curve Diffie-Hellman): Using elliptic curve Diffie-Hellman algorithm for key exchange, offering a more efficient and secure key negotiation.
-
-## TODO List
-
-1. **User Authentication**
-    - User registration and login (based on password hashing with bcrypt)
-    - JWT authentication (to secure API access)
-
-2. **Key Exchange Module**
-    - Implement ECDH key exchange algorithm
-    - Support for generating a shared key and secure transmission between client and server
-
-3. **Message Encryption**
-    - Text message encryption and decryption (using AES-GCM)
-    - Real-time encrypted message transmission over WebSocket
-    - File encryption and upload (images, videos)
-
-4. **Frontend Implementation**
-    - User interface: User registration, login, message display, file upload
-    - Web Crypto API implementation for ECDH key exchange and AES encryption/decryption
-    - WebSocket communication for real-time chat functionality
-
-5. **Security Hardening**
-    - MitM (Man-in-the-Middle) attack prevention
-    - Message authentication tag (using AES-GCM authenticated ciphertext)
-    - Implement message integrity checks
-
-6. **Database Design**
-    - User table (for storing user data)
-    - Message table (for storing encrypted message records)
-    - File table (for storing file metadata)
-
-7. **Testing**
-    - Unit tests and integration tests
-    - Performance testing and encryption speed benchmarks
-
-8. **Deployment and Containerization**
-    - Configure Docker for development environment
-    - Integrate backend deployment with frontend build
-    - Optional: Deploy on cloud service or self-hosted server
-
-## Backend Functionality and Implementation
-
-### 1. **User Authentication**
-The backend provides JWT-based authentication. Users must register and log in; upon successful login, a JWT token is returned for subsequent authorized requests.
-
-- **Registration**: Users submit their username and password (which is hashed using BCrypt). The system checks for uniqueness of the username and saves the user information.
-- **Login**: Users submit their username and password. The backend validates the password and generates a JWT token to be returned to the client. The JWT token is used for authentication in future requests.
-
-### 2. **Key Exchange Module**
-The key exchange is implemented using **ECDH**. This process allows both the client and server to exchange public keys and compute a shared symmetric key, which is then used for encrypting and decrypting data in subsequent communication.
-
-- **Key Generation**: Both the client and server generate ECDH key pairs (private and public keys).
-- **Key Exchange**: The client generates and sends its public key, while the server uses its private key and the client's public key to compute the shared key, and vice versa.
-- **Session Key Generation**: The shared key derived from the ECDH exchange is used to generate a symmetric encryption key for encrypting further communication.
-
-### 3. **Message Encryption and Decryption**
-Messages are encrypted during transmission using **AES-GCM**, ensuring confidentiality and integrity. Each message is encrypted using the shared session key and transmitted via WebSocket in real-time.
-
-- **Encryption**: Before sending a message, the frontend encrypts the message using AES-GCM. Each encrypted message includes an IV (Initialization Vector) and an authentication tag (authTag).
-- **Decryption**: The backend decrypts the encrypted message using the shared session key and the IV, extracting the original message.
-
-### 4. **File Encryption and Upload**
-Files (such as images and videos) are uploaded in chunks, with each chunk being encrypted individually. This is done to optimize large file transfers and prevent interception of data during transmission.
-
-- **File Encryption**: Files are split into smaller chunks, and each chunk is encrypted independently using AES-GCM.
-- **File Upload**: The encrypted file chunks are transmitted via WebSocket or HTTP. The server receives and stores the encrypted file chunks, reassembling them once the entire file has been uploaded.
-
-### 5. **WebSocket Real-Time Communication**
-The backend uses **Spring WebSocket** to provide bidirectional communication. The client and server maintain a real-time WebSocket connection for message push notifications.
-
-- **Message Push**: When a user sends an encrypted message, the message is pushed to the receiving user in real-time through the WebSocket connection.
-- **Message Format**: Each message includes the encrypted text, IV, authentication tag, and other relevant data to ensure secure transmission.
-
-### 6. **Database Design**
-The backend uses **MySQL** to store user information and encrypted message records. Each message contains the encrypted text and the authentication tag, while user information is stored with hashed passwords.
+- **Frontend:** Vue 3 + Vite + Element Plus UI, with cryptography powered by [libsodium-wrappers](https://github.com/jedisct1/libsodium).
+- **Backend:** Spring Boot 3 (Java 17), RESTful API, JWT authentication, and WebSocket for real-time messaging.
+- **Database:** MySQL (for user and message metadata).
 
 ---
 
-## Installation and Running
+## End-to-End Encryption (E2EE) Design
 
-1. **Clone the Project**
-   ```bash
-   git clone https://github.com/your-repository/diffie-hellman-key-exchange.git
-   cd diffie-hellman-key-exchange
-2. **Backend Build**
+### Key Architecture
 
-- Ensure JDK 17 is installed.
+- **Key Generation:**  
+  - On registration, each user generates two key pairs in the browser:
+    - **Ed25519**: For digital signatures (reserved for future use).
+    - **X25519**: For ECDH key agreement (session key negotiation).
+  - **Public keys** are uploaded to the backend.  
+  - **Private keys** are stored only in the browser (localStorage) and never leave the client.
 
-- Build the project using Maven:
+- **Key Exchange:**  
+  - When starting a chat, the frontend fetches the peer's X25519 public key.
+  - Both sides use their X25519 private key and the peer's public key to derive a **shared session key** using ECDH:
+    ```js
+    sessionKey = sodium.crypto_scalarmult(myPrivateKey, theirPublicKey)
+    ```
+  - All keys are encoded in base64url.
 
-   ```bash
-   mvn clean package
-   ```
+### Message Encryption
 
-3. **Frontend Build**
-- Install dependencies and start the development server:
-- ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-4. **Start the Backend Service**
-- Start the Spring Boot backend service:
-- ```bash
-   mvn spring-boot:run
-   ```
+- **Algorithm:**  
+  - Uses **ChaCha20-Poly1305** (via libsodium's `crypto_aead_chacha20poly1305_ietf`).
+- **Process:**  
+  1. For each message, generate a random 12-byte nonce:
+     ```js
+     const nonce = sodium.randombytes_buf(sodium.crypto_aead_chacha20poly1305_ietf_NPUBBYTES)
+     ```
+  2. Encrypt the plaintext with the session key and nonce:
+     ```js
+     const cipher = sodium.crypto_aead_chacha20poly1305_ietf_encrypt(
+       sodium.from_string(plainText),
+       null, null, nonce, sessionKey
+     )
+     ```
+  3. Send the ciphertext and nonce (both base64url) to the backend.
+- **Decryption:**  
+  - The recipient uses the same session key and nonce to decrypt:
+    ```js
+    const plain = sodium.crypto_aead_chacha20poly1305_ietf_decrypt(
+      null, cipher, null, nonce, sessionKey
+    )
+    ```
 
-5. **Access the Application**
-- Open your web browser and navigate to the application URL (e.g., http://localhost:8080).
+### Security Model
+
+- **Private keys** never leave the client; the backend cannot decrypt any message.
+- **Session keys** are derived per friend, allowing both parties to decrypt all historical messages.
+- **Nonces** ensure each message is uniquely encrypted, preventing replay attacks.
+- **Ed25519** keys are reserved for future message signing and verification.
+
+### API & Data Flow
+
+- **Send Message:**  
+  - `POST /api/messages` with fields: `receiverUsername`, `encryptedContent`, `nonce`, `messageType`, and (for files) `fileUrl`, `originalFilename`.
+- **Fetch Messages:**  
+  - `GET /api/messages/{otherUsername}` returns encrypted messages and metadata.
+- **WebSocket:**  
+  - Real-time message delivery using Spring WebSocket, with all payloads encrypted.
+
+---
+
+## Frontend Cryptography Dependency
+
+SecureChat uses the following cryptography library in the frontend:
+
+- [`libsodium-wrappers`](https://github.com/jedisct1/libsodium)  
+  - Version: ^0.7.15  
+  - Provides robust, audited cryptographic primitives for key generation, ECDH, and authenticated encryption.
+
+**Other major frontend dependencies:**
+- Vue 3, Element Plus, Pinia, Axios, @stomp/stompjs
+
+---
+
+## Deployment Guide
+
+### Prerequisites
+
+- **Backend:** JDK 17+, Maven, MySQL
+- **Frontend:** Node.js 18+, npm
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/your-repository/securechat.git
+cd securechat
+```
+
+### 2. Backend Setup
+
+```bash
+# Build the backend
+mvn clean package
+
+# Start the backend (default port 8080)
+mvn spring-boot:run
+```
+
+- Configure your MySQL database and application properties as needed.
+
+### 3. Frontend Setup
+
+```bash
+cd securechat-frontend
+npm install
+npm run build   # For production
+npm run dev     # For development (default port 5173)
+```
+
+### 4. Access the Application
+
+- Open your browser at [http://localhost:5173](http://localhost:5173) (frontend)
+- The backend API runs at [http://localhost:8080](http://localhost:8080)
+
+---
+
+## License
+
+This project is licensed under the MIT License.  
+Cryptography powered by [libsodium](https://github.com/jedisct1/libsodium).

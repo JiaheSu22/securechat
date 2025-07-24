@@ -1,4 +1,4 @@
-# SecureChat API Documentation (Revised)
+# SecureChat API Documentation 
 
 This document provides a detailed specification of the SecureChat backend API. It is intended for frontend developers integrating with the service and for future maintenance.
 
@@ -64,11 +64,11 @@ These are the primary data transfer objects used in the API.
 <details>
 <summary><strong>RegisterRequest</strong></summary>
 
-| Field | Type | Description | Constraints |
-| :--- | :--- | :--- | :--- |
-| `username` | String | The user's login name. | Required, 3-20 characters. |
+| Field | Type | Description | Constraints                 |
+| :--- | :--- | :--- |:----------------------------|
+| `username` | String | The user's login name. | Required.                   |
 | `password` | String | The user's password. | Required, min 6 characters. |
-| `nickname` | String | The user's display name. | Optional. If not provided, it defaults to the `username`. |
+| `nickname` | String | The user's display name. | Required.                   |
 
 **Example:**
 ```json
@@ -220,26 +220,63 @@ These are the primary data transfer objects used in the API.
 
 > All endpoints in this section require authentication.
 
-#### **Upload/Update Current User's Public Key**
-*   **Endpoint:** `PUT /api/users/me/key`
-*   **Description:** Adds or updates the public key for the currently authenticated user.
-*   **Request Body:** `PublicKeyUploadRequest`
+#### **Upload/Update Current User's X25519 Public Key**
+*   **Endpoint:** `PUT /api/users/me/x25519-key`
+*   **Description:** Adds or updates the X25519 public key for the currently authenticated user.
+*   **Request Body:**
+    ```json
+    { "x25519PublicKey": "base64string" }
+    ```
 *   **Success Response:**
     *   **Code:** `200 OK`
     *   **Body:** Empty
 *   **Error Responses:**
-    *   `400 Bad Request`: If `publicKey` field is blank.
+    *   `400 Bad Request`: If `x25519PublicKey` field is blank.
     *   `401 Unauthorized`: If not authenticated.
 
 ---
-#### **Get a User's Public Key and Nickname**
-*   **Endpoint:** `GET /api/users/{username}/key`
-*   **Description:** Retrieves the public key and nickname of a specified user, required to initiate a secure conversation.
+#### **Upload/Update Current User's Ed25519 Public Key**
+*   **Endpoint:** `PUT /api/users/me/ed25519-key`
+*   **Description:** Adds or updates the Ed25519 public key for the currently authenticated user.
+*   **Request Body:**
+    ```json
+    { "ed25519PublicKey": "base64string" }
+    ```
+*   **Success Response:**
+    *   **Code:** `200 OK`
+    *   **Body:** Empty
+*   **Error Responses:**
+    *   `400 Bad Request`: If `ed25519PublicKey` field is blank.
+    *   `401 Unauthorized`: If not authenticated.
+
+---
+#### **Get a User's X25519 Public Key**
+*   **Endpoint:** `GET /api/users/{username}/x25519-key`
+*   **Description:** Retrieves the X25519 public key of a specified user.
 *   **URL Parameters:**
     *   `username` (string): The username of the target user.
 *   **Success Response:**
     *   **Code:** `200 OK`
-    *   **Body:** `UserPublicKeyResponse`
+    *   **Body:**
+    ```json
+    { "x25519PublicKey": "base64string" }
+    ```
+*   **Error Responses:**
+    *   `401 Unauthorized`: If not authenticated.
+    *   `404 Not Found`: If the specified user does not exist.
+
+---
+#### **Get a User's Ed25519 Public Key**
+*   **Endpoint:** `GET /api/users/{username}/ed25519-key`
+*   **Description:** Retrieves the Ed25519 public key of a specified user.
+*   **URL Parameters:**
+    *   `username` (string): The username of the target user.
+*   **Success Response:**
+    *   **Code:** `200 OK`
+    *   **Body:**
+    ```json
+    { "ed25519PublicKey": "base64string" }
+    ```
 *   **Error Responses:**
     *   `401 Unauthorized`: If not authenticated.
     *   `404 Not Found`: If the specified user does not exist.

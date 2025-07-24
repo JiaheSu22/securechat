@@ -2,7 +2,6 @@ package com.eric.securechat.service;
 
 import com.eric.securechat.dto.RegisterRequest;
 import com.eric.securechat.dto.UserDto;
-import com.eric.securechat.dto.UserPublicKeyResponse;
 import com.eric.securechat.model.User;
 import com.eric.securechat.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
