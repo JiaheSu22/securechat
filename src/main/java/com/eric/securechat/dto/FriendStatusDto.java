@@ -11,6 +11,6 @@ public record FriendStatusDto(
         String username,
         String nickname,
         FriendshipStatus status,
-        String publicKey
-) {
-}
+        String ed25519PublicKey,
+        String x25519PublicKey
+) {}

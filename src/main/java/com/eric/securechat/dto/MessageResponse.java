@@ -17,5 +17,6 @@ public record MessageResponse(
         MessageType messageType,
         Instant timestamp,
         String fileUrl,
-        String originalFilename
+        String originalFilename,
+        String nonce
 ) {}

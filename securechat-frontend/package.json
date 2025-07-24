@@ -16,6 +16,7 @@
     "axios": "^1.10.0",
     "element-plus": "^2.10.4",
     "jsencrypt": "^3.3.2",
+    "libsodium-wrappers": "^0.7.15",
     "pinia": "^3.0.3",
     "sockjs-client": "^1.6.1",
     "vue": "^3.5.17",

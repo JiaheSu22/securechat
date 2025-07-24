@@ -39,6 +39,9 @@ public class Message {
     @Column(name = "original_filename")
     private String originalFilename; // 存储文件的原始名称，方便显示
 
+    @Column(name = "nonce", columnDefinition = "TEXT")
+    private String nonce;
+
     @PrePersist
     protected void onCreate() {
         timestamp = Instant.now();
@@ -109,4 +112,7 @@ public class Message {
     public void setOriginalFilename(String originalFilename) {
         this.originalFilename = originalFilename;
     }
+
+    public String getNonce() { return nonce; }
+    public void setNonce(String nonce) { this.nonce = nonce; }
 }

@@ -46,6 +46,8 @@
               <span class="contact-name">{{ user.nickname }}</span>
               <span class="contact-last-msg">Click to start chatting...</span>
             </div>
+            <!-- 红点未读数 -->
+            <span v-if="unreadMap[user.username] > 0" class="unread-dot">{{ unreadMap[user.username] }}</span>
             <!-- 删除好友/拉黑下拉菜单 -->
             <el-dropdown class="more-actions" trigger="click" @command="handleContactCommand" :teleported="false">
               <el-button :icon="MoreFilled" text circle class="more-btn" @click.stop />
@@ -80,11 +82,28 @@
     <!-- 右侧主区域: 聊天窗口 -->
     <div class="chat-area">
       <template v-if="currentChatTarget">
-        <div class="chat-header">
-          <div class="chat-title">
+        <div class="chat-header" style="position: relative; display: flex; align-items: center; justify-content: center;">
+          <div class="chat-title" style="flex: 1; text-align: center;">
             <span>{{ currentChatTarget.nickname }}</span>
             <span class="chat-subtitle">@{{ currentChatTarget.username }}</span>
           </div>
+          <div class="key-actions" style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); display: flex; gap: 8px;">
+            <el-tooltip content="Export Private Key" placement="bottom">
+              <el-button :icon="Download" circle size="small" @click="showExportDialog = true" />
+            </el-tooltip>
+            <el-tooltip content="Import Private Key" placement="bottom">
+              <el-button :icon="Upload" circle size="small" @click="showImportDialog = true" />
+            </el-tooltip>
+          </div>
+          <el-dialog v-model="showExportDialog" title="Export Private Key" width="400px">
+            <el-input type="textarea" :rows="6" :value="exportPrivateKeys()" readonly style="margin-bottom: 10px;" />
+            <el-button type="primary" @click="copyToClipboard(exportPrivateKeys())">Copy</el-button>
+            <el-button type="info" @click="downloadAsFile(exportPrivateKeys())">Download as File</el-button>
+          </el-dialog>
+          <el-dialog v-model="showImportDialog" title="Import Private Key" width="400px">
+            <el-input type="textarea" v-model="importKeyStr" :rows="6" placeholder="Paste your private key JSON here" style="margin-bottom: 10px;" />
+            <el-button type="success" @click="importPrivateKeys(importKeyStr)">Import</el-button>
+          </el-dialog>
         </div>
         <div ref="messageContainerRef" class="message-container">
           <!-- 消息渲染 -->
@@ -93,15 +112,23 @@
               <el-icon v-if="msg.encrypted"><Lock /></el-icon>
               <span :class="{ 'encrypted-text': msg.encrypted }">{{ msg.text }}</span>
             </div>
+            <div v-else-if="msg.fileUrl" class="message-bubble">
+              <p>
+                <el-icon><Paperclip /></el-icon>
+                <span>{{ msg.originalFilename || 'Encrypted File' }}</span>
+                <el-button size="small" type="primary" @click="downloadAndDecryptFile(msg.fileUrl, msg.nonce, sessionKeyMap.value[msg.sender === authStore.user.username ? currentChatTarget.value.username : msg.sender], msg.originalFilename)">Download</el-button>
+              </p>
+            </div>
             <div v-else class="message-bubble">
               <p>{{ msg.text }}</p>
             </div>
           </div>
         </div>
         <div class="message-input-box">
-          <el-tooltip effect="dark" content="Send File (coming soon)" placement="top">
-            <el-button :icon="Paperclip" @click="handleAttachFile" class="input-action-btn" />
+          <el-tooltip effect="dark" content="Send File" placement="top">
+            <el-button :icon="Paperclip" @click="() => $refs.fileInput.click()" class="input-action-btn" />
           </el-tooltip>
+          <input type="file" ref="fileInput" style="display:none" @change="onFileChange" />
           <el-input
             v-model="newMessage"
             type="textarea"
@@ -113,10 +140,6 @@
             class="chat-textarea"
           />
           <el-button :icon="Promotion" type="primary" @click="handleSend" :disabled="isChatBlocked || !canSendMessage" class="input-action-btn">Send</el-button>
-        </div>
-        <div v-if="currentChatTarget && !canSendMessage" class="input-warning">
-          <el-icon color="#F56C6C"><Lock /></el-icon>
-          <span>对方未上传公钥，无法发送消息</span>
         </div>
       </template>
       <template v-else>
@@ -172,14 +195,15 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { ElMessageBox, ElNotification, ElMessage } from 'element-plus';
 // *** FIX: 引入所需图标 ***
-import { Promotion, Search, Paperclip, Plus, MoreFilled, Delete, Bell, Lock, CircleClose, SuccessFilled } from '@element-plus/icons-vue';
+import { Promotion, Search, Paperclip, Plus, MoreFilled, Delete, Bell, Lock, CircleClose, SuccessFilled, Download, Upload } from '@element-plus/icons-vue';
 import { friendshipService } from '@/services/friendshipService';
 // 新增：引入 STOMP 客户端
 import { Client } from '@stomp/stompjs';
 // 新增：引入加密工具
-import { encryptMessage } from '@/services/crypto';
+import sodium from 'libsodium-wrappers'
+// import { encryptMessage } from '@/services/crypto'; // 删除此行，避免重复声明
 // 新增：引入解密工具
-import { decryptMessage } from '@/services/crypto';
+// import { decryptMessage } from '@/services/crypto'; // 删除此行，避免重复声明
 // 新增：引入消息服务
 import { messageService } from '@/services/messageService';
 
@@ -195,12 +219,20 @@ const messageContainerRef = ref(null);
 const searchQuery = ref('');
 const blockedUsers = ref(new Set()); // 新增：用于存储被拉黑的用户ID
 const friendRequests = ref([]);
-const friendPublicKeys = ref(new Map()); // 新增：缓存 username -> publicKey
+// 删除 friendPublicKeys 相关的老公钥缓存
+// const friendPublicKeys = ref(new Map()); // 已废弃
+const unreadMap = ref({}); // username -> count
+const sessionKeyMap = ref({}); // username -> Uint8Array
 
 // --- 好友管理状态 ---
 const addContactDialogVisible = ref(false);
 const addFriendUsername = ref("");
 const friendRequestsDialogVisible = ref(false);
+
+// --- 密钥导入/导出状态 ---
+const showExportDialog = ref(false);
+const showImportDialog = ref(false);
+const importKeyStr = ref('');
 
 // --- 计算属性 ---
 const filteredContactList = computed(() => {
@@ -216,10 +248,8 @@ const isChatBlocked = computed(() => {
 });
 
 const canSendMessage = computed(() => {
-  if (!currentChatTarget.value) return false;
-  if (isChatBlocked.value) return false;
-  const publicKey = friendPublicKeys.value.get(currentChatTarget.value.username);
-  return !!publicKey;
+  // 只需判断当前聊天对象是否存在和未被拉黑
+  return !!currentChatTarget.value && !isChatBlocked.value;
 });
 
 // --- 颜色池和头像颜色 ---
@@ -248,39 +278,45 @@ const connectWebSocket = () => {
     onConnect: () => {
       isSocketConnected.value = true;
       // 订阅个人消息队列
-      client.subscribe('/user/queue/private', (message) => {
+      client.subscribe('/user/queue/private', async (message) => {
         // 新增：解析消息并解密
         try {
           const msgObj = JSON.parse(message.body);
           // 只处理当前聊天对象的消息
           if (!currentChatTarget.value || msgObj.senderUsername !== currentChatTarget.value.username) {
-            // 可选：可做未读消息提醒
+            // 不是当前聊天对象，做未读标记
+            unreadMap.value[msgObj.senderUsername] = (unreadMap.value[msgObj.senderUsername] || 0) + 1;
+            // 可选：弹窗通知
+            ElNotification({
+              title: 'New Message',
+              message: `From ${msgObj.senderUsername}`,
+              type: 'info'
+            });
             return;
           }
-          const privateKey = authStore.privateKey;
-          let decrypted = null;
-          if (privateKey) {
-            decrypted = decryptMessage(privateKey, msgObj.encryptedContent);
-          }
-          if (decrypted) {
-            messages.value.push({
-              id: msgObj.id,
-              text: decrypted,
+          const sessionKey = sessionKeyMap.value[msgObj.senderUsername];
+          let text = '[Decryption Failed]';
+          if (sessionKey) {
+            console.log('Decryption Parameters (Real-time Message)', {
+              sessionKey,
+              nonce: msgObj.nonce,
+              encryptedContent: msgObj.encryptedContent,
               sender: msgObj.senderUsername,
+              currentUser: authStore.user.username
             });
-          } else {
-            messages.value.push({
-              id: msgObj.id,
-              text: '[解密失败] 此消息无法读取',
-              sender: 'system',
-              encrypted: false
-            });
+            text = await decryptMessage(sessionKey, msgObj.nonce, msgObj.encryptedContent);
+            if (!text) text = '[Decryption Failed]';
           }
+          messages.value.push({
+            id: msgObj.id,
+            text,
+            sender: msgObj.senderUsername,
+          });
           scrollToBottom();
         } catch (e) {
           messages.value.push({
             id: Date.now(),
-            text: '[消息处理异常]',
+            text: '[Message Processing Error]',
             sender: 'system',
             encrypted: false
           });
@@ -309,12 +345,12 @@ onMounted(async () => {
       // 新增：缓存好友公钥
       const keyMap = new Map();
       for (const user of res.data) {
-        keyMap.set(user.username, user.publicKey);
+        keyMap.set(user.username, user.x25519PublicKey); // 缓存 x25519 公钥
       }
-      friendPublicKeys.value = keyMap;
+      // friendPublicKeys.value = keyMap; // 已废弃
     } catch (e) {
       contactList.value = [];
-      friendPublicKeys.value = new Map();
+      // friendPublicKeys.value = new Map(); // 已废弃
     }
     // 获取好友请求
     try {
@@ -328,11 +364,12 @@ onMounted(async () => {
 });
 
 // --- 事件处理 ---
-const selectChat = (user) => {
+const selectChat = async (user) => {
   if (currentChatTarget.value?.id === user.id) return;
 
   currentChatTarget.value = user;
   messages.value = [];
+  unreadMap.value[user.username] = 0; // 在切换聊天时清除未读
 
   // 系统欢迎消息
   messages.value.push({
@@ -351,7 +388,41 @@ const selectChat = (user) => {
     });
   }
 
-  scrollToBottom();
+  // 协商密钥
+  const sessionKey = await getSessionKey(user.username);
+  sessionKeyMap.value[user.username] = sessionKey;
+  // 拉取历史消息
+  try {
+    const res = await messageService.getConversation(user.username);
+    for (const msg of res.data) {
+      let text = '[Decryption Failed]';
+      if (sessionKey) {
+        console.log('Decryption Parameters (Historical Messages)', {
+          sessionKey,
+          nonce: msg.nonce,
+          encryptedContent: msg.encryptedContent,
+          sender: msg.senderUsername,
+          currentUser: authStore.user.username
+        });
+        text = await decryptMessage(sessionKey, msg.nonce, msg.encryptedContent);
+        if (!text) text = '[Decryption Failed]';
+      }
+      messages.value.push({
+        id: msg.id,
+        text,
+        sender: msg.senderUsername,
+        timestamp: msg.timestamp,
+        encrypted: true
+      });
+    }
+    scrollToBottom();
+  } catch (e) {
+    messages.value.push({
+      id: 'system-history-error',
+      text: '[Failed to load history messages]',
+      sender: 'system'
+    });
+  }
 };
 
 const handleEnterKey = (event) => {
@@ -377,29 +448,20 @@ const handleEnterKey = (event) => {
 };
 
 const handleSend = async () => {
-  if (newMessage.value.trim() === '' || !currentChatTarget.value || isChatBlocked.value) return;
-
-  // 查找公钥
-  const targetUsername = currentChatTarget.value.username;
-  const publicKey = friendPublicKeys.value.get(targetUsername);
-  if (!publicKey) {
-    ElMessage.error('You cannot send an encrypted message to a user who has not uploaded a public key.');
+  if (newMessage.value.trim() === '' || !currentChatTarget.value) return;
+  const sessionKey = sessionKeyMap.value[currentChatTarget.value.username];
+  if (!sessionKey) {
+    ElMessage.error('Key negotiation failed, cannot send message');
     return;
   }
-
-  // 加密消息
-  const encrypted = encryptMessage(publicKey, newMessage.value);
-  if (!encrypted) {
-    ElMessage.error('Encryption failed, message not sent.');
-    return;
-  }
-
+  const { nonce, ciphertext } = await encryptMessage(sessionKey, newMessage.value);
   // 发送到后端
   try {
     const res = await messageService.sendMessage({
-      receiverUsername: targetUsername,
-      encryptedContent: encrypted,
-      messageType: 'TEXT',
+      receiverUsername: currentChatTarget.value.username,
+      encryptedContent: ciphertext,
+      nonce,
+      messageType: 'TEXT'
     });
     // 用后端返回的消息插入本地消息列表（保证 id、时间等一致）
     const msg = res.data;
@@ -546,15 +608,15 @@ const refreshFriendData = async () => {
       }
     }
     // 新增：同步 friendPublicKeys
-    const keyMap = new Map();
-    for (const user of res.data) {
-      keyMap.set(user.username, user.publicKey);
-    }
-    friendPublicKeys.value = keyMap;
+    // friendPublicKeys.value = new Map(); // 已废弃
+    // for (const user of res.data) {
+    //   keyMap.set(user.username, user.publicKey);
+    // }
+    // friendPublicKeys.value = keyMap;
   } catch {
     contactList.value = [];
     blockedUsers.value = new Set();
-    friendPublicKeys.value = new Map();
+    // friendPublicKeys.value = new Map(); // 已废弃
   }
   try {
     const reqRes = await friendshipService.getPendingRequests();
@@ -595,6 +657,186 @@ const scrollToBottom = () => {
     }
   });
 };
+
+// 假设 authStore.x25519PrivateKey, friend.x25519PublicKey 都是 base64 字符串
+async function getSessionKey(friendUsername) {
+  await sodium.ready;
+  const myPrivateKey = sodium.from_base64(authStore.x25519PrivateKey, sodium.base64_variants.URLSAFE_NO_PADDING);
+  const theirPublicKey = sodium.from_base64(
+    contactList.value.find(u => u.username === friendUsername)?.x25519PublicKey,
+    sodium.base64_variants.URLSAFE_NO_PADDING
+  );
+  if (!myPrivateKey || !theirPublicKey) {
+    console.error('Key missing', myPrivateKey, theirPublicKey);
+    return null;
+  }
+  return sodium.crypto_scalarmult(myPrivateKey, theirPublicKey);
+}
+
+async function encryptMessage(sessionKey, plainText) {
+  await sodium.ready;
+  const NONCE_BYTES = sodium.crypto_aead_chacha20poly1305_ietf_NPUBBYTES;
+  const nonce = sodium.randombytes_buf(NONCE_BYTES);
+  const cipher = sodium.crypto_aead_chacha20poly1305_ietf_encrypt(
+    sodium.from_string(plainText),
+    null,
+    null,
+    nonce,
+    sessionKey
+  );
+  return {
+    nonce: sodium.to_base64(nonce, sodium.base64_variants.URLSAFE_NO_PADDING),
+    ciphertext: sodium.to_base64(cipher, sodium.base64_variants.URLSAFE_NO_PADDING)
+  };
+}
+
+async function decryptMessage(sessionKey, nonceB64, cipherB64) {
+  await sodium.ready;
+  const nonce = sodium.from_base64(nonceB64, sodium.base64_variants.URLSAFE_NO_PADDING);
+  const cipher = sodium.from_base64(cipherB64, sodium.base64_variants.URLSAFE_NO_PADDING);
+  try {
+    const plain = sodium.crypto_aead_chacha20poly1305_ietf_decrypt(
+      null,
+      cipher,
+      null,
+      nonce,
+      sessionKey
+    );
+    return sodium.to_string(plain);
+  } catch (e) {
+    return null;
+  }
+}
+
+async function encryptFile(file, sessionKey) {
+  await sodium.ready;
+  const NONCE_BYTES = sodium.crypto_aead_chacha20poly1305_ietf_NPUBBYTES;
+  const nonce = sodium.randombytes_buf(NONCE_BYTES);
+
+  // 读取文件为 ArrayBuffer
+  const arrayBuffer = await file.arrayBuffer();
+  const plainBytes = new Uint8Array(arrayBuffer);
+
+  // 加密
+  const cipherBytes = sodium.crypto_aead_chacha20poly1305_ietf_encrypt(
+    plainBytes,
+    null, // 无附加数据
+    null,
+    nonce,
+    sessionKey
+  );
+
+  // 返回密文 Blob、nonce
+  return {
+    encryptedBlob: new Blob([cipherBytes]),
+    nonce: sodium.to_base64(nonce, sodium.base64_variants.URLSAFE_NO_PADDING)
+  };
+}
+
+async function uploadEncryptedFile(encryptedBlob, originalFilename) {
+  const formData = new FormData();
+  formData.append('file', encryptedBlob, originalFilename);
+  // 假设 fileService.uploadFile 已实现
+  const res = await fileService.uploadFile(formData);
+  return res.data; // { fileUrl, ... }
+}
+
+async function handleSendFile(file) {
+  const sessionKey = sessionKeyMap.value[currentChatTarget.value.username];
+  if (!sessionKey) {
+    ElMessage.error('Key negotiation failed, cannot send file');
+    return;
+  }
+  // 1. 本地加密
+  const { encryptedBlob, nonce } = await encryptFile(file, sessionKey);
+  // 2. 上传密文
+  const uploadRes = await uploadEncryptedFile(encryptedBlob, file.name);
+  // 3. 发送文件消息
+  await messageService.sendMessage({
+    receiverUsername: currentChatTarget.value.username,
+    messageType: 'FILE',
+    fileUrl: uploadRes.fileUrl,
+    originalFilename: file.name,
+    encryptedContent: '[File Encrypted]', // 可选，或加密文件描述
+    nonce
+  });
+  ElMessage.success('File encrypted and sent');
+}
+
+async function downloadAndDecryptFile(fileUrl, nonce, sessionKey, originalFilename) {
+  await sodium.ready;
+  // 1. 下载密文
+  const response = await fetch(fileUrl);
+  const cipherBuffer = await response.arrayBuffer();
+  const cipherBytes = new Uint8Array(cipherBuffer);
+  // 2. 解密
+  const nonceBytes = sodium.from_base64(nonce, sodium.base64_variants.URLSAFE_NO_PADDING);
+  const plainBytes = sodium.crypto_aead_chacha20poly1305_ietf_decrypt(
+    null,
+    cipherBytes,
+    null,
+    nonceBytes,
+    sessionKey
+  );
+  // 3. 生成 Blob 并下载
+  const blob = new Blob([plainBytes]);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = originalFilename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportPrivateKeys() {
+  const x25519 = localStorage.getItem('x25519PrivateKey');
+  const ed25519 = localStorage.getItem('ed25519PrivateKey');
+  const exportObj = { x25519PrivateKey: x25519, ed25519PrivateKey: ed25519 };
+  return JSON.stringify(exportObj, null, 2);
+}
+
+function importPrivateKeys(jsonStr) {
+  try {
+    const obj = JSON.parse(jsonStr);
+    if (obj.x25519PrivateKey && obj.ed25519PrivateKey) {
+      localStorage.setItem('x25519PrivateKey', obj.x25519PrivateKey);
+      localStorage.setItem('ed25519PrivateKey', obj.ed25519PrivateKey);
+      // 可选：刷新页面或重载 Pinia 状态
+      window.location.reload();
+    } else {
+      ElMessage.error('Invalid private key data');
+    }
+  } catch (e) {
+    ElMessage.error('Failed to parse private key');
+  }
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    ElMessage.success('Copied to clipboard!');
+  });
+}
+function downloadAsFile(text) {
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'securechat-private-key.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function onFileChange(e) {
+  const file = e.target.files[0];
+  if (file) {
+    if (file.size > 50 * 1024 * 1024) {
+      ElMessage.error('File size must not exceed 50MB');
+      return;
+    }
+    handleSendFile(file);
+  }
+  e.target.value = '';
+}
 </script>
 
 <style scoped>
@@ -736,5 +978,28 @@ const scrollToBottom = () => {
   font-size: 14px;
   margin: 8px 0 0 0;
   gap: 6px;
+}
+.unread-dot {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 6px;
+  background: #f56c6c;
+  color: #fff;
+  border-radius: 10px;
+  font-size: 12px;
+  text-align: center;
+  margin-left: 8px;
+  position: absolute;
+  right: 40px; /* 根据你的布局调整 */
+  top: 50%;
+  transform: translateY(-50%);
+}
+.key-actions {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 8px;
 }
 </style>

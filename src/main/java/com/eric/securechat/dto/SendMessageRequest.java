@@ -20,6 +20,8 @@ public record SendMessageRequest(
 
         String fileUrl,
 
-        String originalFilename
+        String originalFilename,
+
+        String nonce
 ) {
 }

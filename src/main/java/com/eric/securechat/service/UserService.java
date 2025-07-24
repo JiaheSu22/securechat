@@ -61,34 +61,6 @@ public class UserService {
     }
 
     /**
-     * 为当前认证的用户上传或更新其公钥
-     */
-    @Transactional
-    public void updateUserPublicKey(String username, String publicKey) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + username));
-        user.setPublicKey(publicKey);
-        userRepository.save(user); // JPA 会智能地执行 UPDATE
-    }
-
-    /**
-     * 根据用户名获取其公钥和昵称
-     * @return 返回一个包含公钥和昵称的DTO
-     */
-    @Transactional(readOnly = true)
-    public UserPublicKeyResponse getUserPublicKey(String username) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User '" + username + "' not found."));
-
-        if (user.getPublicKey() == null || user.getPublicKey().isBlank()) {
-            throw new IllegalStateException("User '" + username + "' has not uploaded a public key yet.");
-        }
-
-        // Service层负责构建并返回DTO，Controller只负责传递
-        return new UserPublicKeyResponse(user.getUsername(), user.getNickname(), user.getPublicKey());
-    }
-
-    /**
      * 【新增方法】根据用户名获取用户公开信息
      * @param username 用户名
      * @return 包含用户ID、用户名和昵称的DTO
@@ -98,5 +70,41 @@ public class UserService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User '" + username + "' not found."));
         return new UserDto(user.getId(), user.getUsername(), user.getNickname());
+    }
+
+    @Transactional
+    public void updateUserX25519Key(String username, String x25519PublicKey) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + username));
+        user.setX25519PublicKey(x25519PublicKey);
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void updateUserEd25519Key(String username, String ed25519PublicKey) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + username));
+        user.setEd25519PublicKey(ed25519PublicKey);
+        userRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public String getUserX25519Key(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User '" + username + "' not found."));
+        if (user.getX25519PublicKey() == null || user.getX25519PublicKey().isBlank()) {
+            throw new IllegalStateException("User '" + username + "' has not uploaded a X25519 public key yet.");
+        }
+        return user.getX25519PublicKey();
+    }
+
+    @Transactional(readOnly = true)
+    public String getUserEd25519Key(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User '" + username + "' not found."));
+        if (user.getEd25519PublicKey() == null || user.getEd25519PublicKey().isBlank()) {
+            throw new IllegalStateException("User '" + username + "' has not uploaded an Ed25519 public key yet.");
+        }
+        return user.getEd25519PublicKey();
     }
 }

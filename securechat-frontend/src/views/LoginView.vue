@@ -50,20 +50,6 @@
           </el-button>
         </el-form-item>
 
-        <!-- 新增：私钥导入区域 -->
-        <div class="import-key-toggle" @click="showImportKey = !showImportKey">
-          <el-link type="info">{{ (showImportKey ? '🔑 Hide private key import' : '🔑 Import local private key (optional)') }}</el-link>
-        </div>
-        <el-form-item v-if="showImportKey" class="import-key-row">
-          <el-input
-            v-model="importPrivateKey"
-            type="textarea"
-            :rows="4"
-            placeholder="Paste your private key PEM here (-----BEGIN PRIVATE KEY----- ...)"
-          />
-          <el-button type="success" style="margin-top: 8px;" @click="handleImportKey" :loading="importLoading">Import & Login</el-button>
-        </el-form-item>
-
         <div class="register-link">
           <p>Don't have an account? <router-link to="/register">Sign up</router-link></p>
         </div>
@@ -75,7 +61,7 @@
 <script setup>
 import { reactive, ref } from 'vue' // 从 vue 导入 reactive 和 ref
 import { useRouter } from 'vue-router'
-import { Lock, User, Key } from '@element-plus/icons-vue'
+import { Lock, User } from '@element-plus/icons-vue'
 import { ElNotification } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 
@@ -101,9 +87,6 @@ const loginRules = reactive({
 // --- 核心修复结束 ---
 
 const loading = ref(false)
-const showImportKey = ref(false);
-const importPrivateKey = ref('');
-const importLoading = ref(false);
 
 const handleLogin = async () => {
   if (!loginFormRef.value) return; // 防御式编程，确保表单已挂载
@@ -136,45 +119,6 @@ const handleLogin = async () => {
       return false;
     }
   });
-};
-
-const handleImportKey = async () => {
-  const key = importPrivateKey.value.trim();
-  if (!key) {
-    ElNotification({ title: 'Error', message: 'Please enter your private key', type: 'error' });
-    return;
-  }
-  importLoading.value = true;
-  // 1. 预处理私钥内容（去掉头尾和换行）
-  let cleanKey = key
-    .replace('-----BEGIN PRIVATE KEY-----', '')
-    .replace('-----END PRIVATE KEY-----', '')
-    .replace(/\n/g, '')
-    .trim();
-  // 2. 尝试登录
-  await loginFormRef.value.validate(async (valid) => {
-    if (valid) {
-      loading.value = true;
-      const result = await authStore.login(loginForm.username, loginForm.password);
-      loading.value = false;
-      if (result && result.success) {
-        // 3. 登录成功后再存私钥
-        authStore.privateKey = cleanKey;
-        localStorage.setItem('privateKey', cleanKey);
-        ElNotification({ title: 'Success', message: 'Login successful!', type: 'success', duration: 2000 });
-        // 通知间隔300ms
-        setTimeout(() => {
-          ElNotification({ title: 'Success', message: 'Private key imported successfully!', type: 'success', duration: 2000 });
-        }, 300);
-        showImportKey.value = false;
-        importPrivateKey.value = '';
-        router.push('/chat');
-      } else {
-        ElNotification({ title: 'Error', message: result?.message || 'Invalid username or password', type: 'error', duration: 2000 });
-      }
-    }
-  });
-  importLoading.value = false;
 };
 </script>
 
@@ -210,19 +154,5 @@ const handleImportKey = async () => {
 }
 .register-link a:hover {
   text-decoration: underline;
-}
-.import-key-toggle {
-  text-align: right;
-  margin-bottom: 8px;
-  cursor: pointer;
-}
-.import-key-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.key-icon {
-  margin-top: 4px;
-  color: #409eff;
 }
 </style>

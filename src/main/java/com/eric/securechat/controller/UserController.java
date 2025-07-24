@@ -9,6 +9,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -27,21 +29,26 @@ public class UserController {
         return ResponseEntity.ok(userDto);
     }
 
-    // Endpoint: 上传/更新自己的公钥 (采纳您的 PUT /me/key)
-    @PutMapping("/me/key")
-    public ResponseEntity<Void> uploadMyPublicKey(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody PublicKeyUploadRequest request) {
 
-        String currentUsername = userDetails.getUsername();
-        userService.updateUserPublicKey(currentUsername, request.publicKey());
+    @PutMapping("/me/x25519-key")
+    public ResponseEntity<Void> uploadMyX25519Key(@AuthenticationPrincipal UserDetails userDetails, @RequestBody Map<String, String> body) {
+        userService.updateUserX25519Key(userDetails.getUsername(), body.get("x25519PublicKey"));
         return ResponseEntity.ok().build();
     }
 
-    // Endpoint: 获取指定用户的公钥和昵称 (采纳您的 GET /{username}/key)
-    @GetMapping("/{username}/key")
-    public ResponseEntity<UserPublicKeyResponse> getUserPublicKey(@PathVariable String username) {
-        UserPublicKeyResponse response = userService.getUserPublicKey(username);
-        return ResponseEntity.ok(response);
+    @PutMapping("/me/ed25519-key")
+    public ResponseEntity<Void> uploadMyEd25519Key(@AuthenticationPrincipal UserDetails userDetails, @RequestBody Map<String, String> body) {
+        userService.updateUserEd25519Key(userDetails.getUsername(), body.get("ed25519PublicKey"));
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{username}/x25519-key")
+    public ResponseEntity<Map<String, String>> getUserX25519Key(@PathVariable String username) {
+        return ResponseEntity.ok(Map.of("x25519PublicKey", userService.getUserX25519Key(username)));
+    }
+
+    @GetMapping("/{username}/ed25519-key")
+    public ResponseEntity<Map<String, String>> getUserEd25519Key(@PathVariable String username) {
+        return ResponseEntity.ok(Map.of("ed25519PublicKey", userService.getUserEd25519Key(username)));
     }
 }

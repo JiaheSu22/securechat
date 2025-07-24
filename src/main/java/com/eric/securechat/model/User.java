@@ -27,8 +27,11 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String password;
 
-    @Column(name = "public_key", columnDefinition = "TEXT")
-    private String publicKey;
+    @Column(name = "x25519_public_key", columnDefinition = "TEXT")
+    private String x25519PublicKey;
+
+    @Column(name = "ed25519_public_key", columnDefinition = "TEXT")
+    private String ed25519PublicKey;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -66,8 +69,10 @@ public class User implements UserDetails {
     @Override
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
-    public String getPublicKey() { return publicKey; }
-    public void setPublicKey(String publicKey) { this.publicKey = publicKey; }
+    public String getX25519PublicKey() { return x25519PublicKey; }
+    public void setX25519PublicKey(String x25519PublicKey) { this.x25519PublicKey = x25519PublicKey; }
+    public String getEd25519PublicKey() { return ed25519PublicKey; }
+    public void setEd25519PublicKey(String ed25519PublicKey) { this.ed25519PublicKey = ed25519PublicKey; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

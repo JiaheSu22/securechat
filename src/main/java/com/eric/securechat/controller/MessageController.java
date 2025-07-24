@@ -51,10 +51,10 @@ public class MessageController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String senderUsername = authentication.getName();
 
-        // 1. 调用我们新的、完美的 service 方法，它返回 Message 实体
+        // 1. 调用 service 方法，它返回 Message 实体
         Message savedMessage = messageService.sendMessage(senderUsername, request);
 
-        // 2. 将实体转换为 DTO，只转换一次
+        // 2. 将实体转换为 DTO
         MessageResponse response = new MessageResponse(
                 savedMessage.getId(),
                 savedMessage.getSender().getUsername(),
@@ -63,15 +63,16 @@ public class MessageController {
                 savedMessage.getMessageType(),
                 savedMessage.getTimestamp(),
                 savedMessage.getFileUrl(),
-                savedMessage.getOriginalFilename()
+                savedMessage.getOriginalFilename(),
+                savedMessage.getNonce() // 新增
         );
 
-        // 3. 使用这个 DTO 进行 WebSocket 通知 (如果服务可用)
+        // 3. WebSocket 通知
         if (webSocketService != null) {
             webSocketService.notifyUser(response.receiverUsername(), response);
         }
 
-        // 4. 使用同样的 DTO 作为 HTTP 响应
+        // 4. HTTP 响应
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
@@ -96,10 +97,12 @@ public class MessageController {
                         msg.getSender().getUsername(),
                         msg.getReceiver().getUsername(),
                         msg.getEncryptedContent(),
-                        msg.getMessageType(), // 传递类型
+                        msg.getMessageType(),
                         msg.getTimestamp(),
                         msg.getFileUrl(),
-                        msg.getOriginalFilename()))
+                        msg.getOriginalFilename(),
+                        msg.getNonce() // 新增
+                ))
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(response);

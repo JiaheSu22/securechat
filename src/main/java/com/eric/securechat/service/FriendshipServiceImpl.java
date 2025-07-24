@@ -238,15 +238,14 @@ public class FriendshipServiceImpl implements FriendshipService {
 
         return allRelations.stream()
                 .map(friendship -> {
-                    // 找出关系中的另一个人
                     User otherUser = friendship.getRequester().equals(currentUser) ? friendship.getAddressee() : friendship.getRequester();
-                    // 创建新的 DTO，包含用户信息、关系状态和公钥
                     return new FriendStatusDto(
                             otherUser.getId(),
                             otherUser.getUsername(),
                             otherUser.getNickname(),
                             friendship.getStatus(),
-                            otherUser.getPublicKey() // 添加公钥
+                            otherUser.getEd25519PublicKey(),
+                            otherUser.getX25519PublicKey()
                     );
                 })
                 .collect(Collectors.toList());

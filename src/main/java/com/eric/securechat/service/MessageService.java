@@ -66,6 +66,7 @@ public class MessageService {
         message.setReceiver(receiver);
         message.setEncryptedContent(request.encryptedContent());
         message.setMessageType(request.messageType());
+        message.setNonce(request.nonce()); // 新增
 
         if (request.messageType() == MessageType.FILE) {
             if (request.fileUrl() == null || request.originalFilename() == null) {
@@ -90,7 +91,8 @@ public class MessageService {
                 savedMessage.getMessageType(),
                 savedMessage.getTimestamp(),
                 savedMessage.getFileUrl(),
-                savedMessage.getOriginalFilename()
+                savedMessage.getOriginalFilename(),
+                savedMessage.getNonce() // 新增
         );
 
         // 3. 通过 WebSocket 将 record 推送给接收者
