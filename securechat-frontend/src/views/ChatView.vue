@@ -44,7 +44,7 @@
             </el-avatar>
             <div class="contact-info">
               <span class="contact-name">{{ user.nickname }}</span>
-              <span class="contact-last-msg">Click to start chatting...</span>
+              <span class="contact-last-msg">{{ getLastMessageText(user.username) }}</span>
             </div>
             <!-- 红点未读数 -->
             <span v-if="unreadMap[user.username] > 0" class="unread-dot">{{ unreadMap[user.username] }}</span>
@@ -227,6 +227,7 @@ import sodium from 'libsodium-wrappers'
 // 新增：引入消息服务
 import { messageService } from '@/services/messageService';
 import { fileService } from '@/services/fileService';
+import { exportPrivateKeysToFile, copyPrivateKeysToClipboard } from '@/utils/keyExport';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -244,6 +245,10 @@ const friendRequests = ref([]);
 // const friendPublicKeys = ref(new Map()); // 已废弃
 const unreadMap = ref({}); // username -> count
 const sessionKeyMap = ref({}); // username -> Uint8Array
+const lastMessageMap = ref({}); // username -> last message object
+const hasPrivateKeys = computed(() => {
+  return !!(authStore.x25519PrivateKey && authStore.ed25519PrivateKey);
+});
 
 // --- 好友管理状态 ---
 const addContactDialogVisible = ref(false);
@@ -307,16 +312,8 @@ const connectWebSocket = () => {
         try {
           const msgObj = JSON.parse(message.body);
           console.log('收到 WebSocket 消息体:', msgObj);
-          // 只处理当前聊天对象的消息
-          if (!currentChatTarget.value || msgObj.senderUsername !== currentChatTarget.value.username) {
-            unreadMap.value[msgObj.senderUsername] = (unreadMap.value[msgObj.senderUsername] || 0) + 1;
-            ElNotification({
-              title: 'New Message',
-              message: `From ${msgObj.senderUsername}`,
-              type: 'info'
-            });
-            return;
-          }
+          
+          // 处理所有接收到的消息，无论是否在当前聊天窗口
           const sessionKey = sessionKeyMap.value[msgObj.senderUsername];
           let text = '[Decryption Failed]';
           if (msgObj.messageType === 'TEXT') {
@@ -334,7 +331,8 @@ const connectWebSocket = () => {
           } else if (msgObj.messageType === 'FILE') {
             text = msgObj.encryptedContent; // 文件消息直接显示描述
           }
-          messages.value.push({
+          
+          const messageObj = {
             id: msgObj.id,
             text,
             sender: msgObj.senderUsername,
@@ -344,7 +342,27 @@ const connectWebSocket = () => {
             nonce: msgObj.nonce,
             timestamp: msgObj.timestamp,
             encrypted: true
-          });
+          };
+          
+          // 更新最新消息
+          if (!lastMessageMap.value[msgObj.senderUsername] || 
+              new Date(msgObj.timestamp) > new Date(lastMessageMap.value[msgObj.senderUsername].timestamp)) {
+            lastMessageMap.value[msgObj.senderUsername] = messageObj;
+          }
+          
+          // 只处理当前聊天对象的消息
+          if (!currentChatTarget.value || msgObj.senderUsername !== currentChatTarget.value.username) {
+            unreadMap.value[msgObj.senderUsername] = (unreadMap.value[msgObj.senderUsername] || 0) + 1;
+            ElNotification({
+              title: 'New Message',
+              message: `From ${msgObj.senderUsername}`,
+              type: 'info'
+            });
+            return;
+          }
+          
+          // 如果是当前聊天对象的消息，添加到消息列表
+          messages.value.push(messageObj);
           scrollToBottom();
         } catch (e) {
           messages.value.push({
@@ -370,6 +388,24 @@ const connectWebSocket = () => {
 // --- 生命周期钩子 ---
 onMounted(async () => {
   if (authStore.isAuthenticated) {
+    // 检查 token 是否过期
+    if (authStore.isTokenExpired()) {
+      console.log('Token expired, logging out...');
+      await authStore.logout(false); // 不显示确认弹窗
+      router.push('/login');
+      return;
+    }
+
+    // 设置定时器，每分钟检查一次 token 过期
+    const tokenCheckInterval = setInterval(() => {
+      if (authStore.isTokenExpired()) {
+        console.log('Token expired during session, logging out...');
+        clearInterval(tokenCheckInterval);
+        authStore.logout(false); // 不显示确认弹窗
+        router.push('/login');
+      }
+    }, 60000); // 每分钟检查一次
+
     // 获取好友列表
     try {
       const res = await friendshipService.getMyFriends();
@@ -381,6 +417,9 @@ onMounted(async () => {
         keyMap.set(user.username, user.x25519PublicKey); // 缓存 x25519 公钥
       }
       // friendPublicKeys.value = keyMap; // 已废弃
+      
+      // 新增：为每个联系人加载最新消息
+      await loadLastMessagesForAllContacts();
     } catch (e) {
       contactList.value = [];
       // friendPublicKeys.value = new Map(); // 已废弃
@@ -424,10 +463,15 @@ const selectChat = async (user) => {
   // 协商密钥
   const sessionKey = await getSessionKey(user.username);
   sessionKeyMap.value[user.username] = sessionKey;
+  
   // 拉取历史消息
   try {
     const res = await messageService.getConversation(user.username);
+    let hasHistoryMessages = false;
+    let hasDecryptionFailed = false;
+    
     for (const msg of res.data) {
+      hasHistoryMessages = true;
       let text = '[Decryption Failed]';
       if (msg.messageType === 'TEXT') {
         if (sessionKey) {
@@ -439,12 +483,18 @@ const selectChat = async (user) => {
             currentUser: authStore.user.username
           });
           text = await decryptMessage(sessionKey, msg.nonce, msg.encryptedContent);
-          if (!text) text = '[Decryption Failed]';
+          if (!text) {
+            text = '[Decryption Failed]';
+            hasDecryptionFailed = true;
+          }
+        } else {
+          hasDecryptionFailed = true;
         }
       } else if (msg.messageType === 'FILE') {
         text = msg.encryptedContent; // 文件消息直接显示描述
       }
-      messages.value.push({
+      
+      const messageObj = {
         id: msg.id,
         text,
         sender: msg.senderUsername,
@@ -454,8 +504,27 @@ const selectChat = async (user) => {
         nonce: msg.nonce,
         timestamp: msg.timestamp,
         encrypted: true
+      };
+      
+      messages.value.push(messageObj);
+      
+      // 更新最新消息
+      if (!lastMessageMap.value[user.username] || 
+          new Date(msg.timestamp) > new Date(lastMessageMap.value[user.username].timestamp)) {
+        lastMessageMap.value[user.username] = messageObj;
+      }
+    }
+    
+    // 如果有历史消息但没有密钥，显示提示
+    if (hasHistoryMessages && !hasPrivateKeys.value) {
+      messages.value.push({
+        id: 'system-no-keys',
+        text: 'Import your private keys to view encrypted message history.',
+        sender: 'system',
+        encrypted: false
       });
     }
+    
     scrollToBottom();
   } catch (e) {
     messages.value.push({
@@ -508,7 +577,7 @@ const handleSend = async () => {
     });
     ElMessage.success('File encrypted and sent');
     // 文件发送成功后
-    messages.value.push({
+    const fileMessageObj = {
       id: uploadRes.id || Date.now(), // 用后端返回的id或本地时间戳
       text: newMessage.value || '[File Encrypted]',
       sender: authStore.user.username,
@@ -518,7 +587,16 @@ const handleSend = async () => {
       nonce,
       timestamp: new Date().toISOString(),
       encrypted: true
-    });
+    };
+    
+    messages.value.push(fileMessageObj);
+    
+    // 更新最新消息
+    if (!lastMessageMap.value[currentChatTarget.value.username] || 
+        new Date(fileMessageObj.timestamp) > new Date(lastMessageMap.value[currentChatTarget.value.username].timestamp)) {
+      lastMessageMap.value[currentChatTarget.value.username] = fileMessageObj;
+    }
+    
     selectedFile.value = null;
     newMessage.value = '';
     return;
@@ -541,13 +619,22 @@ const handleSend = async () => {
     });
     // 用后端返回的消息插入本地消息列表（保证 id、时间等一致）
     const msg = res.data;
-    messages.value.push({
+    const textMessageObj = {
       id: msg.id,
       text: newMessage.value, // 本地显示明文
       sender: authStore.user.username,
       timestamp: msg.timestamp,
       encrypted: true
-    });
+    };
+    
+    messages.value.push(textMessageObj);
+    
+    // 更新最新消息
+    if (!lastMessageMap.value[currentChatTarget.value.username] || 
+        new Date(textMessageObj.timestamp) > new Date(lastMessageMap.value[currentChatTarget.value.username].timestamp)) {
+      lastMessageMap.value[currentChatTarget.value.username] = textMessageObj;
+    }
+    
     newMessage.value = '';
     scrollToBottom();
   } catch (e) {
@@ -560,15 +647,83 @@ const getMessageClass = (sender) => {
   return sender === authStore.user.username ? 'sent' : 'received';
 };
 
-const handleLogout = () => {
-  ElMessageBox.confirm('Are you sure you want to log out?', 'Confirm Logout', {
-    confirmButtonText: 'Yes',
-    cancelButtonText: 'Cancel',
-    type: 'warning',
-  }).then(() => {
-    authStore.logout();
+const getLastMessageText = (username) => {
+  const lastMessage = lastMessageMap.value[username];
+  if (!lastMessage) {
+    return 'Click to start chatting...';
+  }
+  
+  if (lastMessage.messageType === 'FILE') {
+    return '[File]';
+  }
+  
+  // 如果是解密失败的消息，显示特殊提示
+  if (lastMessage.text === '[Decryption Failed]') {
+    return 'Import keys to view message';
+  }
+  
+  // 限制消息长度
+  const maxLength = 30;
+  if (lastMessage.text.length > maxLength) {
+    return lastMessage.text.substring(0, maxLength) + '...';
+  }
+  
+  return lastMessage.text;
+};
+
+// 新增：为所有联系人加载最新消息
+const loadLastMessagesForAllContacts = async () => {
+  for (const contact of contactList.value) {
+    try {
+      // 协商密钥
+      const sessionKey = await getSessionKey(contact.username);
+      sessionKeyMap.value[contact.username] = sessionKey;
+      
+      // 获取最新消息
+      const res = await messageService.getConversation(contact.username);
+      if (res.data && res.data.length > 0) {
+        // 获取最新的一条消息
+        const latestMsg = res.data[res.data.length - 1];
+        let text = '[Decryption Failed]';
+        
+        if (latestMsg.messageType === 'TEXT') {
+          if (sessionKey) {
+            text = await decryptMessage(sessionKey, latestMsg.nonce, latestMsg.encryptedContent);
+            if (!text) text = '[Decryption Failed]';
+          }
+        } else if (latestMsg.messageType === 'FILE') {
+          text = latestMsg.encryptedContent; // 文件消息直接显示描述
+        }
+        
+        const messageObj = {
+          id: latestMsg.id,
+          text,
+          sender: latestMsg.senderUsername,
+          messageType: latestMsg.messageType,
+          fileUrl: latestMsg.fileUrl,
+          originalFilename: latestMsg.originalFilename,
+          nonce: latestMsg.nonce,
+          timestamp: latestMsg.timestamp,
+          encrypted: true
+        };
+        
+        lastMessageMap.value[contact.username] = messageObj;
+      }
+    } catch (e) {
+      console.log(`Failed to load last message for ${contact.username}:`, e);
+    }
+  }
+};
+
+const handleLogout = async () => {
+  // 调用 authStore.logout()，它会显示合并的确认弹窗
+  const logoutSuccess = await authStore.logout();
+  
+  // 只有在成功退出时才跳转到登录页面
+  if (logoutSuccess) {
     router.push('/login');
-  });
+  }
+  // 如果用户取消退出（点击叉号），则留在当前页面
 };
 
 const handleAttachFile = () => {
@@ -891,18 +1046,12 @@ function importPrivateKeys(jsonStr) {
 }
 
 function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    ElMessage.success('Copied to clipboard!');
-  });
+  copyPrivateKeysToClipboard(JSON.parse(text));
 }
+
 function downloadAsFile(text) {
-  const blob = new Blob([text], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'securechat-private-key.json';
-  a.click();
-  URL.revokeObjectURL(url);
+  const keys = JSON.parse(text);
+  exportPrivateKeysToFile(keys, authStore.user?.username);
 }
 
 function onFileChange(e) {

@@ -4,10 +4,13 @@ import { ref, computed } from 'vue'
 import { authService } from '@/services/authService'
 import { userService } from '@/services/userService'
 import sodium from 'libsodium-wrappers'
+import { ElMessageBox, ElMessage } from 'element-plus'
+import { exportPrivateKeysToFile } from '@/utils/keyExport'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token'))
-  const user = ref(JSON.parse(localStorage.getItem('user')))
+  // 修复语法错误：移除多余的括号
+  const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
   const x25519PrivateKey = ref(localStorage.getItem('x25519PrivateKey'))
   const ed25519PrivateKey = ref(localStorage.getItem('ed25519PrivateKey'))
 
@@ -75,11 +78,93 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function logout() {
+  // 改进的退出登录函数
+  async function logout(showConfirmDialog = true) {
+    // 检查是否有私钥需要保存
+    const hasPrivateKeys = x25519PrivateKey.value || ed25519PrivateKey.value;
+    
+    if (showConfirmDialog && hasPrivateKeys) {
+      // 合并的确认弹窗：退出确认 + 私钥保存提醒
+      const result = await new Promise((resolve) => {
+        ElMessageBox.confirm(
+          'You are about to log out. It is recommended to export your private keys for backup, otherwise they will be lost. Would you like to export your private keys before logging out?',
+          'Logout Confirmation',
+          {
+            confirmButtonText: 'Save Keys & Logout',
+            cancelButtonText: 'Logout Only',
+            distinguishCancelAndClose: true,
+            type: 'warning',
+          }
+        ).then(() => {
+          resolve('export');
+        }).catch((action) => {
+          if (action === 'cancel') {
+            resolve('logout_only');
+          } else {
+            resolve('cancel'); // 右上角叉号取消退出
+          }
+        });
+      });
+
+      if (result === 'cancel') {
+        return false; // 用户取消退出，返回 false
+      }
+
+      if (result === 'export') {
+        // 导出私钥并下载文件
+        const exportObj = { 
+          x25519PrivateKey: x25519PrivateKey.value, 
+          ed25519PrivateKey: ed25519PrivateKey.value 
+        };
+        
+        // 使用公共工具函数导出私钥
+        exportPrivateKeysToFile(exportObj, user.value?.username);
+      }
+    }
+
+    // 清理所有认证相关数据
     setToken(null)
     setUser(null)
     setX25519PrivateKey(null)
     setEd25519PrivateKey(null)
+    
+    // 清理其他可能存在的认证相关数据
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    localStorage.removeItem('x25519PrivateKey')
+    localStorage.removeItem('ed25519PrivateKey')
+    
+    // 清理 sessionStorage 中的相关数据
+    sessionStorage.removeItem('token')
+    sessionStorage.removeItem('user')
+    
+    return true; // 成功退出，返回 true
+  }
+
+  // 检查 token 是否过期
+  function isTokenExpired() {
+    if (!token.value) return true;
+    
+    try {
+      // 解析 JWT token 获取过期时间
+      const payload = JSON.parse(atob(token.value.split('.')[1]));
+      const expirationTime = payload.exp * 1000; // 转换为毫秒
+      const currentTime = Date.now();
+      
+      return currentTime >= expirationTime;
+    } catch (e) {
+      // 如果解析失败，认为 token 无效
+      return true;
+    }
+  }
+
+  // 自动清理过期的 token
+  function cleanExpiredToken() {
+    if (isTokenExpired()) {
+      logout();
+      return true;
+    }
+    return false;
   }
 
   return {
@@ -89,7 +174,9 @@ export const useAuthStore = defineStore('auth', () => {
     ed25519PrivateKey,
     isAuthenticated,
     register,
-    login,      // <--- 补上
-    logout
+    login,
+    logout,
+    isTokenExpired,
+    cleanExpiredToken
   }
 })

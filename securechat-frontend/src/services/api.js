@@ -19,4 +19,29 @@ apiClient.interceptors.request.use(config => {
   return Promise.reject(error);
 });
 
+// 响应拦截器：处理 token 过期
+apiClient.interceptors.response.use(
+  response => {
+    return response;
+  },
+  error => {
+    if (error.response?.status === 401) {
+      // Token 过期或无效
+      console.log('Token expired or invalid, logging out...');
+      
+      // 清理本地存储
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('x25519PrivateKey');
+      localStorage.removeItem('ed25519PrivateKey');
+      
+      // 重定向到登录页面
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default apiClient; 

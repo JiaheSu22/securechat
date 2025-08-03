@@ -37,10 +37,21 @@ const router = createRouter({
   ]
 })
 
-// ... 路由守卫代码保持不变 ...
-router.beforeEach((to, from, next) => {
+// 路由守卫：检查认证状态和 token 过期
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+
+  // 检查 token 是否过期
+  if (authStore.isAuthenticated) {
+    const isExpired = authStore.isTokenExpired()
+    if (isExpired) {
+      console.log('Token expired, logging out...')
+      authStore.logout(false) // 不显示确认弹窗
+      next('/login')
+      return
+    }
+  }
 
   if (requiresAuth && !authStore.isAuthenticated) {
     next('/login')
