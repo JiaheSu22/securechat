@@ -1,4 +1,4 @@
-<!-- src/views/LoginView.vue -->
+<!-- LoginView.vue - User login page -->
 <template>
   <div class="login-container">
     <el-card class="login-card">
@@ -8,9 +8,7 @@
         </div>
       </template>
 
-      <!--
-        这个表单现在可以正确地找到 script 中定义的 loginFormRef, loginForm 和 loginRules
-      -->
+      <!-- Login form with validation -->
       <el-form
         ref="loginFormRef"
         :model="loginForm"
@@ -59,7 +57,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue' // 从 vue 导入 reactive 和 ref
+import { reactive, ref } from 'vue' // Import reactive and ref from vue
 import { useRouter } from 'vue-router'
 import { Lock, User } from '@element-plus/icons-vue'
 import { ElNotification } from 'element-plus'
@@ -68,34 +66,34 @@ import { useAuthStore } from '@/stores/auth'
 const router = useRouter()
 const authStore = useAuthStore()
 
-// --- 核心修复 ---
-// 1. 定义 ElForm 组件的引用
+// --- Core Setup ---
+// 1. Define ElForm component reference
 const loginFormRef = ref(null)
 
-// 2. 使用 reactive 创建一个响应式对象来存储表单数据
-//    这完美地匹配了模板中的 :model="loginForm" 和 v-model="loginForm.username"
+// 2. Create reactive object to store form data
+//    This perfectly matches the template's :model="loginForm" and v-model="loginForm.username"
 const loginForm = reactive({
   username: '',
   password: '',
 })
 
-// 3. 定义与模板中的 :rules="loginRules" 匹配的验证规则
+// 3. Define validation rules that match the template's :rules="loginRules"
 const loginRules = reactive({
   username: [{ required: true, message: 'Please input username', trigger: 'blur' }],
   password: [{ required: true, message: 'Please input password', trigger: 'blur' }],
 })
-// --- 核心修复结束 ---
+// --- Core Setup End ---
 
 const loading = ref(false)
 
 const handleLogin = async () => {
-  if (!loginFormRef.value) return; // 防御式编程，确保表单已挂载
+  if (!loginFormRef.value) return; // Defensive programming, ensure form is mounted
 
-  // 使用 Element Plus 的表单验证方法
+  // Use Element Plus form validation method
   await loginFormRef.value.validate(async (valid) => {
     if (valid) {
       loading.value = true;
-      // 调用 store 的 login action, 传入 loginForm 中的数据
+      // Call store's login action with data from loginForm
       const result = await authStore.login(loginForm.username, loginForm.password);
       loading.value = false;
       if (result && result.success) {
@@ -115,7 +113,7 @@ const handleLogin = async () => {
         });
       }
     } else {
-      console.log('error submit!');
+      // console.log('error submit!');
       return false;
     }
   });
@@ -123,7 +121,7 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-/* 样式保持不变 */
+/* Styles remain unchanged */
 .login-container {
   display: flex;
   justify-content: center;

@@ -1,4 +1,4 @@
-// src/main.js
+// src/main.js - Application entry point
 
 import './assets/main.css'
 
@@ -18,13 +18,15 @@ app.use(createPinia())
 app.use(router)
 app.use(ElementPlus)
 
-// 应用启动时检查 token 过期
+// Check token expiration on app startup
 const authStore = useAuthStore()
 if (authStore.isAuthenticated) {
-  // 检查 token 是否过期
+  // Check if token is expired
   if (authStore.isTokenExpired()) {
-    console.log('Token expired on app startup, logging out...')
-    authStore.logout(false) // 不显示确认弹窗
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Token expired on app startup, logging out...')
+    }
+    authStore.logout(false) // Don't show confirmation dialog
   }
 }
 

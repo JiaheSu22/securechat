@@ -1,11 +1,11 @@
-// src/utils/keyExport.js
+// src/utils/keyExport.js - Private key export utilities
 import { ElMessage } from 'element-plus'
 
 /**
- * 导出私钥到文件
- * @param {Object} keys - 包含私钥的对象
- * @param {string} username - 用户名
- * @returns {boolean} - 是否成功导出
+ * Export private keys to file
+ * @param {Object} keys - Object containing private keys
+ * @param {string} username - Username
+ * @returns {boolean} - Whether export was successful
  */
 export function exportPrivateKeysToFile(keys, username) {
   try {
@@ -29,9 +29,9 @@ export function exportPrivateKeysToFile(keys, username) {
 }
 
 /**
- * 复制私钥到剪贴板
- * @param {Object} keys - 包含私钥的对象
- * @returns {boolean} - 是否成功复制
+ * Copy private keys to clipboard
+ * @param {Object} keys - Object containing private keys
+ * @returns {boolean} - Whether copy was successful
  */
 export function copyPrivateKeysToClipboard(keys) {
   try {

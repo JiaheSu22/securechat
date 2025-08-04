@@ -12,43 +12,61 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Repository interface for Friendship entity operations.
+ * Provides data access methods for friendship relationship management.
+ */
 @Repository
 public interface FriendshipRepository extends JpaRepository<Friendship, FriendshipId> {
 
-
     /**
-     * 根据请求者和接收者，精确查找一个好友请求。
-     * 这个查询是单向的。
+     * Finds a friendship request by requester and addressee.
+     * This query is directional (one-way).
      *
-     * @param requester 请求者
-     * @param addressee 接收者
-     * @return 存在则返回 Friendship 记录，否则返回 Optional.empty()
+     * @param requester The user who sent the request
+     * @param addressee The user who received the request
+     * @return Optional containing the friendship if found, empty otherwise
      */
     Optional<Friendship> findByRequesterAndAddressee(User requester, User addressee);
 
     /**
-     * 根据两个用户查找他们之间的好友关系记录。
-     * 由于请求者和接收者可能互换，所以需要检查两种情况。
-     * 我们使用 @Query 注解来明确定义查询逻辑，避免方法名解析的歧义。
+     * Finds friendship relationship between two users.
+     * Checks both directions since requester and addressee can be swapped.
      *
-     * @param user1 第一个用户
-     * @param user2 第二个用户
-     * @return 存在则返回 Friendship 记录，否则返回 Optional.empty()
+     * @param user1 The first user
+     * @param user2 The second user
+     * @return Optional containing the friendship if found, empty otherwise
      */
     @Query("SELECT f FROM Friendship f WHERE " +
             "(f.requester = :user1 AND f.addressee = :user2) OR " +
             "(f.requester = :user2 AND f.addressee = :user1)")
     Optional<Friendship> findFriendshipBetweenUsers(@Param("user1") User user1, @Param("user2") User user2);
 
+    /**
+     * Finds friendships where the user is the requester with specified status.
+     * 
+     * @param requester The user who sent the requests
+     * @param status The friendship status to filter by
+     * @return List of friendships matching the criteria
+     */
     List<Friendship> findByRequesterAndStatus(User requester, FriendshipStatus status);
+    
+    /**
+     * Finds friendships where the user is the addressee with specified status.
+     * 
+     * @param addressee The user who received the requests
+     * @param status The friendship status to filter by
+     * @return List of friendships matching the criteria
+     */
     List<Friendship> findByAddresseeAndStatus(User addressee, FriendshipStatus status);
 
     /**
-     * [新增] 一次性查询与特定用户相关的所有指定状态的好友关系。
-     * 这个查询会同时查找该用户作为请求者或接收者的情况。
-     * @param user 用户实体
-     * @param status 期望的关系状态
-     * @return 符合条件的好友关系列表
+     * Finds all friendships for a user with specified status.
+     * Checks both requester and addressee roles for the user.
+     * 
+     * @param user The user to find friendships for
+     * @param status The friendship status to filter by
+     * @return List of friendships matching the criteria
      */
     @Query("SELECT f FROM Friendship f WHERE (f.requester = :user OR f.addressee = :user) AND f.status = :status")
     List<Friendship> findAllByUserAndStatus(@Param("user") User user, @Param("status") FriendshipStatus status);

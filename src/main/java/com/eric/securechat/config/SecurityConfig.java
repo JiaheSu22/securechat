@@ -16,9 +16,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import com.eric.securechat.exception.JwtAuthenticationEntryPoint; // 导入我们的新类
-import org.springframework.beans.factory.annotation.Autowired; // 导入 Autowired
+import com.eric.securechat.exception.JwtAuthenticationEntryPoint;
+import org.springframework.beans.factory.annotation.Autowired;
 
+/**
+ * Security configuration for the secure chat application.
+ * Configures JWT authentication, CORS, CSRF protection, and endpoint security.
+ * Provides stateless session management with custom authentication entry point.
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -26,25 +31,39 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
 
-    @Autowired // 注入我们自定义的 AuthenticationEntryPoint
+    @Autowired
     private JwtAuthenticationEntryPoint unauthorizedHandler;
 
+    /**
+     * Constructor for SecurityConfig.
+     * 
+     * @param jwtAuthFilter JWT authentication filter for token validation
+     * @param userDetailsService Service for loading user details
+     */
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter, UserDetailsService userDetailsService) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.userDetailsService = userDetailsService;
     }
 
+    /**
+     * Configures the security filter chain with JWT authentication.
+     * Sets up CORS, CSRF, session management, and endpoint authorization.
+     * 
+     * @param http The HttpSecurity object to configure
+     * @return Configured SecurityFilterChain
+     * @throws Exception if configuration fails
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
                 .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(unauthorizedHandler) // <-- 在这里配置！
+                        .authenticationEntryPoint(unauthorizedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/ws").permitAll() // Allow auth endpoints
-                        .anyRequest().authenticated() // Secure all other endpoints
+                        .requestMatchers("/api/auth/**", "/ws").permitAll()
+                        .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider())
@@ -53,6 +72,11 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Configures the authentication provider with user details service and password encoder.
+     * 
+     * @return Configured DaoAuthenticationProvider
+     */
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
@@ -61,11 +85,23 @@ public class SecurityConfig {
         return authProvider;
     }
 
+    /**
+     * Configures the authentication manager for the application.
+     * 
+     * @param config The authentication configuration
+     * @return Configured AuthenticationManager
+     * @throws Exception if configuration fails
+     */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 
+    /**
+     * Configures the password encoder for secure password hashing.
+     * 
+     * @return BCryptPasswordEncoder instance
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

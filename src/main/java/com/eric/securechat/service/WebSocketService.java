@@ -6,6 +6,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for WebSocket messaging operations.
+ * Handles real-time message delivery to specific users.
+ */
 @Service
 public class WebSocketService {
 
@@ -13,20 +17,23 @@ public class WebSocketService {
 
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Constructor for WebSocketService.
+     * 
+     * @param messagingTemplate Template for WebSocket messaging operations
+     */
     public WebSocketService(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
     }
 
     /**
      * Notifies a specific user about a new message by sending it over WebSocket.
+     * Sends message to user-specific destination for real-time delivery.
      *
-     * @param username The username of the recipient.
-     * @param message  The message DTO to send.
+     * @param username The username of the recipient
+     * @param message The message DTO to send
      */
     public void notifyUser(String username, MessageResponse message) {
-        // The destination is "/queue/private". Spring prepends "/user/{username}" automatically.
-        // So the message is sent to a user-specific destination like "/user/bob/queue/private".
-        // The client must be subscribed to "/user/queue/private" to receive it.
         String destination = "/queue/private";
         messagingTemplate.convertAndSendToUser(username, destination, message);
 

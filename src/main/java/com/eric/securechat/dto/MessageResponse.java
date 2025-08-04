@@ -6,8 +6,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * DTO for sending a message back to the client.
- * Now implemented as a Record.
+ * Response DTO for message operations.
+ * Contains message data for API responses and WebSocket notifications.
  */
 public record MessageResponse(
         UUID id,

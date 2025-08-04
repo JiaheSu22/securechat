@@ -1,7 +1,7 @@
-<!-- src/views/ChatView.vue (FIXED ICON NAME) -->
+<!-- ChatView.vue - Main chat interface component -->
 <template>
   <div class="main-layout">
-    <!-- 左侧边栏: 联系人列表 -->
+    <!-- Left sidebar: Contact list -->
     <div class="sidebar">
       <div v-if="authStore.user" class="sidebar-header">
         <el-avatar :style="{ backgroundColor: getAvatarColor(authStore.user) }" class="user-avatar" size="default">
@@ -15,23 +15,22 @@
       </div>
 
       <div class="contact-list-container">
-        <!-- 搜索与添加好友 -->
+        <!-- Search and add contact -->
         <div class="search-add-bar">
           <el-input v-model="searchQuery" placeholder="Search contacts..." :prefix-icon="Search" clearable />
           <el-tooltip effect="dark" content="Add New Contact" placement="top">
-            <!-- *** FIX: 使用正确的图标名称 Plus *** -->
             <el-button :icon="Plus" circle @click="openAddContactDialog" class="add-btn" />
           </el-tooltip>
         </div>
 
-        <!-- 好友申请 -->
+        <!-- Friend requests section -->
         <div class="friend-requests-section" @click="openFriendRequestsDialog">
           <el-icon><Bell /></el-icon>
           <span>Friend Requests</span>
           <el-badge :value="friendRequests.length" class="request-badge" />
         </div>
 
-        <!-- 联系人列表 -->
+        <!-- Contact list -->
         <div class="contact-list">
           <div
             v-for="user in filteredContactList"
@@ -46,9 +45,9 @@
               <span class="contact-name">{{ user.nickname }}</span>
               <span class="contact-last-msg">{{ getLastMessageText(user.username) }}</span>
             </div>
-            <!-- 红点未读数 -->
+            <!-- Unread message count -->
             <span v-if="unreadMap[user.username] > 0" class="unread-dot">{{ unreadMap[user.username] }}</span>
-            <!-- 删除好友/拉黑下拉菜单 -->
+            <!-- Contact actions dropdown menu -->
             <el-dropdown class="more-actions" trigger="click" @command="handleContactCommand" :teleported="false">
               <el-button :icon="MoreFilled" text circle class="more-btn" @click.stop />
               <template #dropdown>
@@ -76,7 +75,7 @@
             </el-dropdown>
           </div>
         </div>
-        <!-- 新增：密钥管理按钮区 -->
+        <!-- Key management buttons -->
         <div class="key-actions-bar" style="display: flex; justify-content: center; gap: 12px; margin: 16px 0 24px 0; padding-bottom: 16px;">
           <el-tooltip content="Export Private Key" placement="top">
             <el-button :icon="Download" circle size="small" @click="showExportDialog = true" />
@@ -97,7 +96,7 @@
       </div>
     </div>
 
-    <!-- 右侧主区域: 聊天窗口 -->
+    <!-- Right main area: Chat window -->
     <div class="chat-area">
       <template v-if="currentChatTarget">
         <div class="chat-header" style="position: relative; display: flex; align-items: center; justify-content: center;">
@@ -107,24 +106,28 @@
           </div>
         </div>
         <div ref="messageContainerRef" class="message-container">
-          <!-- 消息渲染 -->
+          <!-- Message rendering -->
           <div v-for="msg in messages" :key="msg.id" :class="['message-row', getMessageClass(msg.sender)]">
-            <!-- 系统消息 -->
+            <!-- System messages -->
             <div v-if="msg.sender === 'system'" class="system-message">
               <el-icon v-if="msg.encrypted"><Lock /></el-icon>
               <span :class="{ 'encrypted-text': msg.encrypted }">{{ msg.text }}</span>
             </div>
 
-            <!-- 用户消息 -->
+            <!-- User messages -->
             <div v-else class="message-bubble" style="position: relative;">
               <div v-if="msg.messageType === 'FILE'">
                 <div class="file-message-content" style="display: flex; align-items: center;">
                   <el-icon :size="24" style="margin-right: 8px;"><Document /></el-icon>
                   <div class="file-info">
                     <span class="file-name">{{ msg.originalFilename }}</span>
+                    <!-- File description display -->
+                    <div v-if="msg.text && msg.text !== '[File Encrypted]'" class="file-description">
+                      {{ msg.text }}
+                    </div>
                   </div>
                 </div>
-                <!-- 下载图标按钮，气泡外右侧/左侧 -->
+                <!-- Download button, positioned outside bubble -->
                 <el-button
                   :icon="Download"
                   circle
@@ -171,7 +174,7 @@
       </template>
     </div>
 
-    <!-- 添加好友弹窗 -->
+    <!-- Add contact dialog -->
     <el-dialog v-model="addContactDialogVisible" title="Add New Contact" width="400px">
       <div class="add-contact-dialog-content">
         <div class="add-contact-search-bar">
@@ -191,7 +194,7 @@
       </template>
     </el-dialog>
 
-    <!-- 好友请求弹窗 -->
+    <!-- Friend requests dialog -->
     <el-dialog v-model="friendRequestsDialogVisible" title="Pending Friend Requests" width="400px">
       <div v-if="!friendRequests.length">No pending requests.</div>
       <div v-for="req in friendRequests" :key="req.id" class="friend-request-item">
@@ -214,17 +217,14 @@ import { ref, onMounted, nextTick, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { ElMessageBox, ElNotification, ElMessage } from 'element-plus';
-// *** FIX: 引入所需图标 ***
+// Import required icons
 import { Promotion, Search, Paperclip, Plus, MoreFilled, Delete, Bell, Lock, CircleClose, SuccessFilled, Download, Upload, Document } from '@element-plus/icons-vue';
 import { friendshipService } from '@/services/friendshipService';
-// 新增：引入 STOMP 客户端
+// Import STOMP client for WebSocket communication
 import { Client } from '@stomp/stompjs';
-// 新增：引入加密工具
+// Import encryption utilities
 import sodium from 'libsodium-wrappers'
-// import { encryptMessage } from '@/services/crypto'; // 删除此行，避免重复声明
-// 新增：引入解密工具
-// import { decryptMessage } from '@/services/crypto'; // 删除此行，避免重复声明
-// 新增：引入消息服务
+// Import message and file services
 import { messageService } from '@/services/messageService';
 import { fileService } from '@/services/fileService';
 import { exportPrivateKeysToFile, copyPrivateKeysToClipboard } from '@/utils/keyExport';
@@ -232,17 +232,15 @@ import { exportPrivateKeysToFile, copyPrivateKeysToClipboard } from '@/utils/key
 const router = useRouter();
 const authStore = useAuthStore();
 
-// --- 状态管理 ---
+// --- State Management ---
 const contactList = ref([]);
 const currentChatTarget = ref(null);
 const newMessage = ref('');
 const messages = ref([]);
 const messageContainerRef = ref(null);
 const searchQuery = ref('');
-const blockedUsers = ref(new Set()); // 新增：用于存储被拉黑的用户ID
+const blockedUsers = ref(new Set()); // Store blocked user IDs
 const friendRequests = ref([]);
-// 删除 friendPublicKeys 相关的老公钥缓存
-// const friendPublicKeys = ref(new Map()); // 已废弃
 const unreadMap = ref({}); // username -> count
 const sessionKeyMap = ref({}); // username -> Uint8Array
 const lastMessageMap = ref({}); // username -> last message object
@@ -250,21 +248,21 @@ const hasPrivateKeys = computed(() => {
   return !!(authStore.x25519PrivateKey && authStore.ed25519PrivateKey);
 });
 
-// --- 好友管理状态 ---
+// --- Friend Management State ---
 const addContactDialogVisible = ref(false);
 const addFriendUsername = ref("");
 const friendRequestsDialogVisible = ref(false);
 
-// --- 密钥导入/导出状态 ---
+// --- Key Import/Export State ---
 const showExportDialog = ref(false);
 const showImportDialog = ref(false);
 const importKeyStr = ref('');
 
-// --- 文件附件状态 ---
+// --- File Attachment State ---
 const selectedFile = ref(null);
 const fileInput = ref(null);
 
-// --- 计算属性 ---
+// --- Computed Properties ---
 const filteredContactList = computed(() => {
   if (!searchQuery.value) return contactList.value;
   return contactList.value.filter(contact =>
@@ -278,15 +276,15 @@ const isChatBlocked = computed(() => {
 });
 
 const canSendMessage = computed(() => {
-  // 只需判断当前聊天对象是否存在和未被拉黑
+  // Check if current chat target exists and is not blocked
   return !!currentChatTarget.value && !isChatBlocked.value;
 });
 
-// --- 颜色池和头像颜色 ---
+// --- Color Pool and Avatar Colors ---
 const colorPool = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FED766', '#9B59B6', '#F39C12', '#1ABC9C', '#3498DB'];
 const getAvatarColor = (user) => {
   if (!user) return '#CCCCCC';
-  // 用 username 做 hash，保证同一用户颜色一致
+  // Use username for hash to ensure consistent color for same user
   const key = user.username || user.nickname || '';
   let hash = 0;
   for (let i = 0; i < key.length; i++) {
@@ -295,10 +293,10 @@ const getAvatarColor = (user) => {
   return colorPool[Math.abs(hash) % colorPool.length];
 };
 
-const stompClient = ref(null); // 保存 STOMP 客户端实例
+const stompClient = ref(null); // Store STOMP client instance
 const isSocketConnected = ref(false);
 
-// --- WebSocket 连接与订阅 ---
+// --- WebSocket Connection and Subscription ---
 const connectWebSocket = () => {
   const token = localStorage.getItem('token');
   if (stompClient.value && stompClient.value.connected) return;
@@ -307,29 +305,42 @@ const connectWebSocket = () => {
     reconnectDelay: 5000,
     onConnect: () => {
       isSocketConnected.value = true;
-      // 订阅个人消息队列
+      // Subscribe to personal message queue
       client.subscribe('/user/queue/private', async (message) => {
         try {
           const msgObj = JSON.parse(message.body);
-          console.log('收到 WebSocket 消息体:', msgObj);
+          // console.log('Received WebSocket message:', msgObj);
           
-          // 处理所有接收到的消息，无论是否在当前聊天窗口
+          // Process all received messages, regardless of current chat window
           const sessionKey = sessionKeyMap.value[msgObj.senderUsername];
           let text = '[Decryption Failed]';
           if (msgObj.messageType === 'TEXT') {
             if (sessionKey) {
-              console.log('Decryption Parameters (Real-time Message)', {
-                sessionKey,
-                nonce: msgObj.nonce,
-                encryptedContent: msgObj.encryptedContent,
-                sender: msgObj.senderUsername,
-                currentUser: authStore.user.username
-              });
+              // console.log('Decryption Parameters (Real-time Message)', {
+              //   sessionKey,
+              //   nonce: msgObj.nonce,
+              //   encryptedContent: msgObj.encryptedContent,
+              //   sender: msgObj.senderUsername,
+              //   currentUser: authStore.user.username
+              // });
               text = await decryptMessage(sessionKey, msgObj.nonce, msgObj.encryptedContent);
               if (!text) text = '[Decryption Failed]';
             }
           } else if (msgObj.messageType === 'FILE') {
-            text = msgObj.encryptedContent; // 文件消息直接显示描述
+            // File messages need description decryption
+            if (sessionKey) {
+              // console.log('Decryption Parameters (File Message)', {
+              //   sessionKey,
+              //   nonce: msgObj.nonce,
+              //   encryptedContent: msgObj.encryptedContent,
+              //   sender: msgObj.senderUsername,
+              //   currentUser: authStore.user.username
+              // });
+              text = await decryptMessage(sessionKey, msgObj.nonce, msgObj.encryptedContent);
+              if (!text) text = '[Decryption Failed]';
+            } else {
+              text = '[Decryption Failed]';
+            }
           }
           
           const messageObj = {
@@ -344,13 +355,13 @@ const connectWebSocket = () => {
             encrypted: true
           };
           
-          // 更新最新消息
+          // Update latest message
           if (!lastMessageMap.value[msgObj.senderUsername] || 
               new Date(msgObj.timestamp) > new Date(lastMessageMap.value[msgObj.senderUsername].timestamp)) {
             lastMessageMap.value[msgObj.senderUsername] = messageObj;
           }
           
-          // 只处理当前聊天对象的消息
+          // Only process messages from current chat target
           if (!currentChatTarget.value || msgObj.senderUsername !== currentChatTarget.value.username) {
             unreadMap.value[msgObj.senderUsername] = (unreadMap.value[msgObj.senderUsername] || 0) + 1;
             ElNotification({
@@ -361,7 +372,7 @@ const connectWebSocket = () => {
             return;
           }
           
-          // 如果是当前聊天对象的消息，添加到消息列表
+          // If message is from current chat target, add to message list
           messages.value.push(messageObj);
           scrollToBottom();
         } catch (e) {
@@ -385,65 +396,58 @@ const connectWebSocket = () => {
   stompClient.value = client;
 };
 
-// --- 生命周期钩子 ---
+// --- Lifecycle Hooks ---
 onMounted(async () => {
   if (authStore.isAuthenticated) {
-    // 检查 token 是否过期
+    // Check if token is expired
     if (authStore.isTokenExpired()) {
-      console.log('Token expired, logging out...');
-      await authStore.logout(false); // 不显示确认弹窗
+      // console.log('Token expired, logging out...');
+      await authStore.logout(false); // Don't show confirmation dialog
       router.push('/login');
       return;
     }
 
-    // 设置定时器，每分钟检查一次 token 过期
+    // Set timer to check token expiration every minute
     const tokenCheckInterval = setInterval(() => {
       if (authStore.isTokenExpired()) {
-        console.log('Token expired during session, logging out...');
+        // console.log('Token expired during session, logging out...');
         clearInterval(tokenCheckInterval);
-        authStore.logout(false); // 不显示确认弹窗
+        authStore.logout(false); // Don't show confirmation dialog
         router.push('/login');
       }
-    }, 60000); // 每分钟检查一次
+    }, 60000); // Check every minute
 
-    // 获取好友列表
+    // Get friend list
     try {
       const res = await friendshipService.getMyFriends();
       contactList.value = res.data;
       blockedUsers.value = new Set(contactList.value.filter(u => u.status === 'BLOCKED').map(u => u.id));
-      // 新增：缓存好友公钥
-      const keyMap = new Map();
-      for (const user of res.data) {
-        keyMap.set(user.username, user.x25519PublicKey); // 缓存 x25519 公钥
-      }
-      // friendPublicKeys.value = keyMap; // 已废弃
       
-      // 新增：为每个联系人加载最新消息
+      // Load latest messages for all contacts
       await loadLastMessagesForAllContacts();
     } catch (e) {
       contactList.value = [];
-      // friendPublicKeys.value = new Map(); // 已废弃
     }
-    // 获取好友请求
+    // Get friend requests
     try {
       const reqRes = await friendshipService.getPendingRequests();
       friendRequests.value = reqRes.data;
     } catch (e) {
       friendRequests.value = [];
     }
-    connectWebSocket(); // 新增：建立 WebSocket 连接
+    connectWebSocket(); // Establish WebSocket connection
   }
 });
 
-// --- 事件处理 ---
+// --- Event Handlers ---
 const selectChat = async (user) => {
   if (currentChatTarget.value?.id === user.id) return;
 
   currentChatTarget.value = user;
   messages.value = [];
-  unreadMap.value[user.username] = 0; // 在切换聊天时清除未读
+  unreadMap.value[user.username] = 0; // Clear unread count when switching chats
 
-  // 系统欢迎消息
+  // System welcome message
   messages.value.push({
     id: 'system-welcome',
     text: 'Messages are end-to-end encrypted. No one outside of this chat, not even Secure Chat, can read them.',
@@ -451,7 +455,7 @@ const selectChat = async (user) => {
     encrypted: true
   });
 
-  // 如果被拉黑，显示系统提示
+  // Show system prompt if user is blocked
   if (user.status === 'BLOCKED') {
     messages.value.push({
       id: 'system-blocked',
@@ -460,11 +464,11 @@ const selectChat = async (user) => {
     });
   }
 
-  // 协商密钥
+  // Negotiate session key
   const sessionKey = await getSessionKey(user.username);
   sessionKeyMap.value[user.username] = sessionKey;
   
-  // 拉取历史消息
+  // Load conversation history
   try {
     const res = await messageService.getConversation(user.username);
     let hasHistoryMessages = false;
@@ -475,13 +479,13 @@ const selectChat = async (user) => {
       let text = '[Decryption Failed]';
       if (msg.messageType === 'TEXT') {
         if (sessionKey) {
-          console.log('Decryption Parameters (Historical Messages)', {
-            sessionKey,
-            nonce: msg.nonce,
-            encryptedContent: msg.encryptedContent,
-            sender: msg.senderUsername,
-            currentUser: authStore.user.username
-          });
+          // console.log('Decryption Parameters (Historical Messages)', {
+          //   sessionKey,
+          //   nonce: msg.nonce,
+          //   encryptedContent: msg.encryptedContent,
+          //   sender: msg.senderUsername,
+          //   currentUser: authStore.user.username
+          // });
           text = await decryptMessage(sessionKey, msg.nonce, msg.encryptedContent);
           if (!text) {
             text = '[Decryption Failed]';
@@ -491,7 +495,24 @@ const selectChat = async (user) => {
           hasDecryptionFailed = true;
         }
       } else if (msg.messageType === 'FILE') {
-        text = msg.encryptedContent; // 文件消息直接显示描述
+        // File messages need description decryption
+        if (sessionKey) {
+          // console.log('Decryption Parameters (Historical File Messages)', {
+          //   sessionKey,
+          //   nonce: msg.nonce,
+          //   encryptedContent: msg.encryptedContent,
+          //   sender: msg.senderUsername,
+          //   currentUser: authStore.user.username
+          // });
+          text = await decryptMessage(sessionKey, msg.nonce, msg.encryptedContent);
+          if (!text) {
+            text = '[Decryption Failed]';
+            hasDecryptionFailed = true;
+          }
+        } else {
+          text = '[Decryption Failed]';
+          hasDecryptionFailed = true;
+        }
       }
       
       const messageObj = {
@@ -508,14 +529,14 @@ const selectChat = async (user) => {
       
       messages.value.push(messageObj);
       
-      // 更新最新消息
+      // Update latest message
       if (!lastMessageMap.value[user.username] || 
           new Date(msg.timestamp) > new Date(lastMessageMap.value[user.username].timestamp)) {
         lastMessageMap.value[user.username] = messageObj;
       }
     }
     
-    // 如果有历史消息但没有密钥，显示提示
+    // Show prompt if there are historical messages but no keys
     if (hasHistoryMessages && !hasPrivateKeys.value) {
       messages.value.push({
         id: 'system-no-keys',
@@ -538,60 +559,89 @@ const selectChat = async (user) => {
 const handleEnterKey = (event) => {
   if (isChatBlocked.value) return;
   if (event.shiftKey) {
-    // Shift + Enter 换行
-    // 在当前光标处插入换行符
+    // Shift + Enter for new line
+    // Insert newline at current cursor position
     const textarea = event.target;
     const value = newMessage.value;
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     newMessage.value = value.slice(0, start) + '\n' + value.slice(end);
-    // 移动光标到新行
+    // Move cursor to new line
     nextTick(() => {
       textarea.selectionStart = textarea.selectionEnd = start + 1;
     });
     event.preventDefault();
     return;
   } else {
-    // Enter 发送
+    // Enter to send
     handleSend();
   }
 };
 
 const handleSend = async () => {
   if (selectedFile.value) {
-    // 发送文件消息
+    // Send file message
     const sessionKey = sessionKeyMap.value[currentChatTarget.value.username];
     if (!sessionKey) {
       ElMessage.error('Key negotiation failed, cannot send file');
       return;
     }
-    const { encryptedBlob, nonce } = await encryptFile(selectedFile.value, sessionKey);
+    
+    // Generate nonce for file encryption
+    await sodium.ready;
+    const NONCE_BYTES = sodium.crypto_aead_chacha20poly1305_ietf_NPUBBYTES;
+    const fileNonce = sodium.randombytes_buf(NONCE_BYTES);
+    const fileNonceB64 = sodium.to_base64(fileNonce, sodium.base64_variants.URLSAFE_NO_PADDING);
+    
+    // Encrypt file
+    const arrayBuffer = await selectedFile.value.arrayBuffer();
+    const plainBytes = new Uint8Array(arrayBuffer);
+    const cipherBytes = sodium.crypto_aead_chacha20poly1305_ietf_encrypt(
+      plainBytes,
+      null,
+      null,
+      fileNonce,
+      sessionKey
+    );
+    const encryptedBlob = new Blob([cipherBytes]);
+    
     const uploadRes = await uploadEncryptedFile(encryptedBlob, selectedFile.value.name);
+    
+    // Encrypt file description (using same nonce)
+    const fileDescription = newMessage.value || '[File Encrypted]';
+    const encryptedDescription = sodium.crypto_aead_chacha20poly1305_ietf_encrypt(
+      sodium.from_string(fileDescription),
+      null,
+      null,
+      fileNonce,
+      sessionKey
+    );
+    
     await messageService.sendMessage({
       receiverUsername: currentChatTarget.value.username,
       messageType: 'FILE',
       fileUrl: uploadRes.fileUrl,
       originalFilename: selectedFile.value.name,
-      encryptedContent: newMessage.value || '[File Encrypted]', // 文件描述
-      nonce
+      encryptedContent: sodium.to_base64(encryptedDescription, sodium.base64_variants.URLSAFE_NO_PADDING), // Encrypted file description
+      nonce: fileNonceB64 // Use file encryption nonce
     });
     ElMessage.success('File encrypted and sent');
-    // 文件发送成功后
+    // After file is sent successfully
     const fileMessageObj = {
-      id: uploadRes.id || Date.now(), // 用后端返回的id或本地时间戳
-      text: newMessage.value || '[File Encrypted]',
+      id: uploadRes.id || Date.now(), // Use backend returned id or local timestamp
+      text: fileDescription, // Display plain text description locally
       sender: authStore.user.username,
       messageType: 'FILE',
       fileUrl: uploadRes.fileUrl,
       originalFilename: selectedFile.value.name,
-      nonce,
+      nonce: fileNonceB64,
       timestamp: new Date().toISOString(),
       encrypted: true
     };
     
     messages.value.push(fileMessageObj);
     
-    // 更新最新消息
+    // Update latest message
     if (!lastMessageMap.value[currentChatTarget.value.username] || 
         new Date(fileMessageObj.timestamp) > new Date(lastMessageMap.value[currentChatTarget.value.username].timestamp)) {
       lastMessageMap.value[currentChatTarget.value.username] = fileMessageObj;
@@ -601,7 +651,7 @@ const handleSend = async () => {
     newMessage.value = '';
     return;
   }
-  // 发送文本消息
+  // Send text message
   if (newMessage.value.trim() === '' || !currentChatTarget.value) return;
   const sessionKey = sessionKeyMap.value[currentChatTarget.value.username];
   if (!sessionKey) {
@@ -609,7 +659,7 @@ const handleSend = async () => {
     return;
   }
   const { nonce, ciphertext } = await encryptMessage(sessionKey, newMessage.value);
-  // 发送到后端
+  // Send to backend
   try {
     const res = await messageService.sendMessage({
       receiverUsername: currentChatTarget.value.username,
@@ -617,11 +667,11 @@ const handleSend = async () => {
       nonce,
       messageType: 'TEXT'
     });
-    // 用后端返回的消息插入本地消息列表（保证 id、时间等一致）
+    // Insert message into local message list using backend response (ensuring id, time consistency)
     const msg = res.data;
     const textMessageObj = {
       id: msg.id,
-      text: newMessage.value, // 本地显示明文
+      text: newMessage.value, // Display plain text locally
       sender: authStore.user.username,
       timestamp: msg.timestamp,
       encrypted: true
@@ -629,7 +679,7 @@ const handleSend = async () => {
     
     messages.value.push(textMessageObj);
     
-    // 更新最新消息
+    // Update latest message
     if (!lastMessageMap.value[currentChatTarget.value.username] || 
         new Date(textMessageObj.timestamp) > new Date(lastMessageMap.value[currentChatTarget.value.username].timestamp)) {
       lastMessageMap.value[currentChatTarget.value.username] = textMessageObj;
@@ -657,12 +707,12 @@ const getLastMessageText = (username) => {
     return '[File]';
   }
   
-  // 如果是解密失败的消息，显示特殊提示
+  // Show special prompt for decryption failed messages
   if (lastMessage.text === '[Decryption Failed]') {
     return 'Import keys to view message';
   }
   
-  // 限制消息长度
+  // Limit message length
   const maxLength = 30;
   if (lastMessage.text.length > maxLength) {
     return lastMessage.text.substring(0, maxLength) + '...';
@@ -671,18 +721,18 @@ const getLastMessageText = (username) => {
   return lastMessage.text;
 };
 
-// 新增：为所有联系人加载最新消息
+// Load latest messages for all contacts
 const loadLastMessagesForAllContacts = async () => {
   for (const contact of contactList.value) {
     try {
-      // 协商密钥
+      // Negotiate session key
       const sessionKey = await getSessionKey(contact.username);
       sessionKeyMap.value[contact.username] = sessionKey;
       
-      // 获取最新消息
+      // Get latest message
       const res = await messageService.getConversation(contact.username);
       if (res.data && res.data.length > 0) {
-        // 获取最新的一条消息
+        // Get the latest message
         const latestMsg = res.data[res.data.length - 1];
         let text = '[Decryption Failed]';
         
@@ -692,7 +742,13 @@ const loadLastMessagesForAllContacts = async () => {
             if (!text) text = '[Decryption Failed]';
           }
         } else if (latestMsg.messageType === 'FILE') {
-          text = latestMsg.encryptedContent; // 文件消息直接显示描述
+          // File messages need description decryption
+          if (sessionKey) {
+            text = await decryptMessage(sessionKey, latestMsg.nonce, latestMsg.encryptedContent);
+            if (!text) text = '[Decryption Failed]';
+          } else {
+            text = '[Decryption Failed]';
+          }
         }
         
         const messageObj = {
@@ -710,20 +766,20 @@ const loadLastMessagesForAllContacts = async () => {
         lastMessageMap.value[contact.username] = messageObj;
       }
     } catch (e) {
-      console.log(`Failed to load last message for ${contact.username}:`, e);
+      // console.log(`Failed to load last message for ${contact.username}:`, e);
     }
   }
 };
 
 const handleLogout = async () => {
-  // 调用 authStore.logout()，它会显示合并的确认弹窗
+  // Call authStore.logout(), which will show a combined confirmation dialog
   const logoutSuccess = await authStore.logout();
   
-  // 只有在成功退出时才跳转到登录页面
+  // Only redirect to login page if logout is successful
   if (logoutSuccess) {
     router.push('/login');
   }
-  // 如果用户取消退出（点击叉号），则留在当前页面
+  // If user cancels logout (clicks X), stay on current page
 };
 
 const handleAttachFile = () => {
@@ -978,18 +1034,46 @@ async function handleSendFile(file) {
     ElMessage.error('Key negotiation failed, cannot send file');
     return;
   }
-  // 1. 本地加密
-  const { encryptedBlob, nonce } = await encryptFile(file, sessionKey);
-  // 2. 上传密文
+  
+  // 生成一个nonce用于文件加密
+  await sodium.ready;
+  const NONCE_BYTES = sodium.crypto_aead_chacha20poly1305_ietf_NPUBBYTES;
+  const fileNonce = sodium.randombytes_buf(NONCE_BYTES);
+  const fileNonceB64 = sodium.to_base64(fileNonce, sodium.base64_variants.URLSAFE_NO_PADDING);
+  
+  // 加密文件
+  const arrayBuffer = await file.arrayBuffer();
+  const plainBytes = new Uint8Array(arrayBuffer);
+  const cipherBytes = sodium.crypto_aead_chacha20poly1305_ietf_encrypt(
+    plainBytes,
+    null,
+    null,
+    fileNonce,
+    sessionKey
+  );
+  const encryptedBlob = new Blob([cipherBytes]);
+  
+  // 上传密文
   const uploadRes = await uploadEncryptedFile(encryptedBlob, file.name);
-  // 3. 发送文件消息
+  
+  // 加密文件描述（使用相同的nonce）
+  const fileDescription = newMessage.value || '[File Encrypted]';
+  const encryptedDescription = sodium.crypto_aead_chacha20poly1305_ietf_encrypt(
+    sodium.from_string(fileDescription),
+    null,
+    null,
+    fileNonce,
+    sessionKey
+  );
+  
+  // 发送文件消息
   await messageService.sendMessage({
     receiverUsername: currentChatTarget.value.username,
     messageType: 'FILE',
     fileUrl: uploadRes.fileUrl,
     originalFilename: file.name,
-    encryptedContent: newMessage.value || '[File Encrypted]', // 文件描述
-    nonce
+    encryptedContent: sodium.to_base64(encryptedDescription, sodium.base64_variants.URLSAFE_NO_PADDING), // 加密的文件描述
+    nonce: fileNonceB64 // 使用文件加密的nonce
   });
   ElMessage.success('File encrypted and sent');
   // 清空输入框和附件标识
@@ -1323,5 +1407,14 @@ function getDownloadBtnStyle(msg) {
 .file-name {
   font-weight: 500;
   margin-left: 6px;
+}
+
+/* 新增：文件描述样式 */
+.file-description {
+  font-size: 12px;
+  color: #606266;
+  margin-top: 4px;
+  font-style: italic;
+  line-height: 1.3;
 }
 </style>

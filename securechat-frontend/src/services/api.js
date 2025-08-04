@@ -1,14 +1,14 @@
-// src/services/api.js
+// src/services/api.js - API client configuration
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: 'http://localhost:8080/api', // Spring Boot 后端地址
+  baseURL: 'http://localhost:8080/api', // Spring Boot backend address
   headers: {
     'Content-Type': 'application/json'
   }
 });
 
-// 请求拦截器：自动加 token
+// Request interceptor: automatically add token
 apiClient.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -19,23 +19,25 @@ apiClient.interceptors.request.use(config => {
   return Promise.reject(error);
 });
 
-// 响应拦截器：处理 token 过期
+// Response interceptor: handle token expiration
 apiClient.interceptors.response.use(
   response => {
     return response;
   },
   error => {
     if (error.response?.status === 401) {
-      // Token 过期或无效
-      console.log('Token expired or invalid, logging out...');
+      // Token expired or invalid
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Token expired or invalid, logging out...');
+      }
       
-      // 清理本地存储
+      // Clean local storage
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('x25519PrivateKey');
       localStorage.removeItem('ed25519PrivateKey');
       
-      // 重定向到登录页面
+      // Redirect to login page
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }

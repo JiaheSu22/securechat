@@ -1,6 +1,6 @@
 package com.eric.securechat.service;
 
-import com.eric.securechat.dto.MessageResponse;       // <<< 修改：使用你已有的Record
+import com.eric.securechat.dto.MessageResponse;
 import com.eric.securechat.dto.SendMessageRequest;
 import com.eric.securechat.exception.UserNotFoundException;
 import com.eric.securechat.model.Friendship;
@@ -20,20 +20,30 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Service for handling message operations including sending messages and retrieving conversations.
+ * Provides secure message handling with friendship validation and real-time WebSocket notifications.
+ */
 @Service
 public class MessageService {
 
     private static final Logger logger = LoggerFactory.getLogger(MessageService.class);
 
-    // --- 依赖声明区 ---
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final FriendshipService friendshipService;
     private final SimpMessagingTemplate messagingTemplate;
     private final ModelMapper modelMapper;
 
-
-    // <<< 修改：构造函数，接收新增的依赖
+    /**
+     * Constructor for MessageService.
+     * 
+     * @param messageRepository Repository for message data operations
+     * @param userRepository Repository for user data operations
+     * @param friendshipService Service for friendship validation
+     * @param messagingTemplate Template for WebSocket messaging
+     * @param modelMapper Mapper for object transformations
+     */
     public MessageService(MessageRepository messageRepository, UserRepository userRepository, FriendshipService friendshipService, SimpMessagingTemplate messagingTemplate, ModelMapper modelMapper) {
         this.messageRepository = messageRepository;
         this.userRepository = userRepository;
@@ -42,8 +52,20 @@ public class MessageService {
         this.modelMapper = modelMapper;
     }
 
+    /**
+     * Sends a message from one user to another with friendship validation.
+     * Validates that both users exist and have an accepted friendship status.
+     * Saves the message to database and sends real-time notification via WebSocket.
+     * 
+     * @param senderUsername The username of the message sender
+     * @param request The message request containing receiver and content details
+     * @return The saved message entity
+     * @throws UserNotFoundException if sender or receiver is not found
+     * @throws IllegalArgumentException if sender and receiver are the same
+     * @throws IllegalStateException if friendship validation fails
+     */
     @Transactional
-    public Message sendMessage(String senderUsername, SendMessageRequest request) { // <<< 返回类型保持 Message 不变
+    public Message sendMessage(String senderUsername, SendMessageRequest request) {
         logger.info("Attempting to send message from '{}' to '{}'. Type: {}",
                 senderUsername, request.receiverUsername(), request.messageType());
 
@@ -57,16 +79,14 @@ public class MessageService {
             throw new IllegalArgumentException("Sender and receiver cannot be the same person.");
         }
 
-        // ===== 好友关系验证，现在可以成功调用了 =====
         checkFriendshipStatus(sender, receiver);
 
-        // 后续逻辑不变
         Message message = new Message();
         message.setSender(sender);
         message.setReceiver(receiver);
         message.setEncryptedContent(request.encryptedContent());
         message.setMessageType(request.messageType());
-        message.setNonce(request.nonce()); // 新增
+        message.setNonce(request.nonce());
 
         if (request.messageType() == MessageType.FILE) {
             if (request.fileUrl() == null || request.originalFilename() == null) {
@@ -76,15 +96,11 @@ public class MessageService {
             message.setOriginalFilename(request.originalFilename());
         }
 
-        // <<< 这里是核心修改区 START >>>
-        // 1. 先保存消息到数据库
         Message savedMessage = messageRepository.save(message);
         logger.info("Message from '{}' to '{}' saved successfully.", sender.getUsername(), receiver.getUsername());
 
-        // 2. 将保存后的 Message 实体转换为 MessageResponse record，用于 WebSocket 推送
-        // ModelMapper 会自动处理从 message.sender.username 到 record.senderUsername 的映射
         MessageResponse messageToSend = new MessageResponse(
-                savedMessage.getId(), //id的类型不一致，手动转换
+                savedMessage.getId(),
                 savedMessage.getSender().getUsername(),
                 savedMessage.getReceiver().getUsername(),
                 savedMessage.getEncryptedContent(),
@@ -92,10 +108,9 @@ public class MessageService {
                 savedMessage.getTimestamp(),
                 savedMessage.getFileUrl(),
                 savedMessage.getOriginalFilename(),
-                savedMessage.getNonce() // 新增
+                savedMessage.getNonce()
         );
 
-        // 3. 通过 WebSocket 将 record 推送给接收者
         String destination = "/queue/messages";
         logger.info("Pushing real-time message to user '{}' at destination '{}'", receiver.getUsername(), destination);
         messagingTemplate.convertAndSendToUser(
@@ -105,36 +120,41 @@ public class MessageService {
         );
         logger.info("Message successfully pushed via WebSocket to {}", receiver.getUsername());
 
-        // 4. 保持原有方法签名，返回原始的 Message 对象给HTTP调用方
         return savedMessage;
-        // <<< 核心修改区 END >>>
     }
 
+    /**
+     * Retrieves conversation history between two users.
+     * Validates that both users exist and have an accepted friendship status.
+     * 
+     * @param currentUsername The username of the current user
+     * @param otherUsername The username of the other user in the conversation
+     * @return List of messages in the conversation
+     * @throws UserNotFoundException if either user is not found
+     * @throws IllegalStateException if friendship validation fails
+     */
     @Transactional(readOnly = true)
-    public List<Message> getConversation(String currentUsername, String otherUsername) { // 方法完全保持不变
+    public List<Message> getConversation(String currentUsername, String otherUsername) {
         User currentUser = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new UserNotFoundException("User not found: " + currentUsername));
 
         User otherUser = userRepository.findByUsername(otherUsername)
                 .orElseThrow(() -> new UserNotFoundException("User not found: " + otherUsername));
 
-        // ===== 好友关系验证，现在可以成功调用了 =====
         checkFriendshipStatus(currentUser, otherUser);
 
         return messageRepository.findConversation(currentUser.getId(), otherUser.getId());
     }
 
     /**
-     * 【关键修复】第3步：在这个私有方法中，使用我们刚刚声明并初始化的 this.friendshipService 字段
-     * 因为 friendshipService 现在是类的成员，所以可以直接调用。
-     * 检查两个用户之间的好友关系。如果关系不是 ACCEPTED，则抛出异常。
-     *
-     * @param userOne 第一个用户
-     * @param userTwo 第二个用户
-     * @throws IllegalStateException 如果关系不是好友或被拉黑
+     * Validates the friendship status between two users.
+     * Ensures that users have an accepted friendship status and are not blocked.
+     * 
+     * @param userOne The first user
+     * @param userTwo The second user
+     * @throws IllegalStateException if users are not friends or if relationship is blocked
      */
-    private void checkFriendshipStatus(User userOne, User userTwo) { // 方法完全保持不变
-        // 这里调用的 friendshipService 就是我们在构造函数里赋值的那个对象
+    private void checkFriendshipStatus(User userOne, User userTwo) {
         Optional<Friendship> friendshipOpt = friendshipService.findFriendshipRelation(userOne, userTwo);
 
         if (friendshipOpt.isEmpty()) {

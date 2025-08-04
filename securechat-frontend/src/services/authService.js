@@ -1,4 +1,4 @@
-// src/services/authService.js
+// src/services/authService.js - Authentication service
 import apiClient from './api';
 
 export const authService = {

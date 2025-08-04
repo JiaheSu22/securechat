@@ -8,6 +8,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
+/**
+ * Entity representing friendship relationships between users.
+ * Uses composite primary key to ensure unique relationships.
+ */
 @Data
 @NoArgsConstructor
 @Entity
@@ -15,44 +19,63 @@ import java.time.LocalDateTime;
         @UniqueConstraint(columnNames = {"requester_id", "addressee_id"})})
 public class Friendship {
 
-    // 使用 @EmbeddedId 注解来声明一个嵌入式的复合主键
+    /**
+     * Composite primary key for the friendship relationship.
+     */
     @EmbeddedId
     private FriendshipId id;
 
-    // --- 关系映射 ---
-
-    // @ManyToOne 定义了多对一关系
-    // @MapsId("requesterId") 告诉 JPA，这个 User 实体映射到复合主键 id 中的 "requesterId" 字段
-    // insertable=false, updatable=false 表示这个关系字段本身不直接写入数据库的列，它的值由 id.requesterId 控制
+    /**
+     * The user who sent the friend request.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("requesterId")
     @JoinColumn(name = "requester_id")
     private User requester;
 
+    /**
+     * The user who received the friend request.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("addresseeId")
     @JoinColumn(name = "addressee_id")
     private User addressee;
 
+    /**
+     * Current status of the friendship relationship.
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private FriendshipStatus status;
 
+    /**
+     * Timestamp when the friendship was created.
+     */
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * Timestamp when the friendship was last updated.
+     */
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /**
+     * User who performed the last action on this friendship.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "action_user_id")
     private User actionUser;
 
-    // 提供一个方便的构造函数
+    /**
+     * Constructor for creating a new friendship relationship.
+     * 
+     * @param requester The user sending the friend request
+     * @param addressee The user receiving the friend request
+     */
     public Friendship(User requester, User addressee) {
-        // 创建复合主键实例
         this.id = new FriendshipId(requester.getId(), addressee.getId());
         this.requester = requester;
         this.addressee = addressee;

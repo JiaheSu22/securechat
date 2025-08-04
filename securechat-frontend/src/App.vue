@@ -7,5 +7,5 @@ import { RouterView } from 'vue-router'
 </template>
 
 <style scoped>
-/* 你可以在这里添加一些全局根组件的样式 */
+/* You can add some global root component styles here */
 </style>

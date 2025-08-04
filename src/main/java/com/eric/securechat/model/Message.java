@@ -6,7 +6,10 @@ import java.util.UUID;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 
-
+/**
+ * Message entity representing a chat message between users.
+ * Contains encrypted content, metadata, and file information for secure messaging.
+ */
 @Entity
 @Table(name = "messages")
 public class Message {
@@ -15,39 +18,66 @@ public class Message {
     @GeneratedValue
     private UUID id;
 
+    /**
+     * The user who sent the message.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sender_id", nullable = false)
     private User sender;
 
+    /**
+     * The user who received the message.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "receiver_id", nullable = false)
     private User receiver;
 
+    /**
+     * The encrypted content of the message.
+     */
     @Column(name = "encrypted_content", nullable = false, columnDefinition = "TEXT")
     private String encryptedContent;
 
+    /**
+     * Timestamp when the message was created.
+     */
     @Column(nullable = false, updatable = false)
     private Instant timestamp;
 
-    @Enumerated(EnumType.STRING) // 重要：使用字符串形式存储枚举，更具可读性
+    /**
+     * Type of message (TEXT, FILE, etc.).
+     */
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MessageType messageType;
 
+    /**
+     * URL for accessing the file if this is a file message.
+     */
     @Column(name = "file_url")
-    private String fileUrl; // 存储文件的访问URL
+    private String fileUrl;
 
+    /**
+     * Original filename for display purposes.
+     */
     @Column(name = "original_filename")
-    private String originalFilename; // 存储文件的原始名称，方便显示
+    private String originalFilename;
 
+    /**
+     * Cryptographic nonce used for encryption.
+     */
     @Column(name = "nonce", columnDefinition = "TEXT")
     private String nonce;
 
+    /**
+     * Sets the creation timestamp before persisting the entity.
+     */
     @PrePersist
     protected void onCreate() {
         timestamp = Instant.now();
     }
 
-    // --- Getters and Setters ---
+    // Getters and Setters
 
     public UUID getId() {
         return id;

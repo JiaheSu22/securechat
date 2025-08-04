@@ -1,4 +1,4 @@
-// src/services/userService.js
+// src/services/userService.js - User service
 import apiClient from './api';
 
 export const userService = {

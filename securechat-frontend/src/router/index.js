@@ -1,8 +1,8 @@
-// src/router/index.js
+// src/router/index.js - Vue Router configuration
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import ChatView from '../views/ChatView.vue'
-// 1. 导入 RegisterView
+// 1. Import RegisterView
 import RegisterView from '../views/RegisterView.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -20,7 +20,7 @@ const router = createRouter({
       component: RegisterView
     },
     {
-      path: '/chat', // 我们稍后会将这个路径改成 '/'
+      path: '/chat', // We will change this path to '/' later
       name: 'chat',
       component: ChatView,
       meta: { requiresAuth: true }
@@ -37,17 +37,19 @@ const router = createRouter({
   ]
 })
 
-// 路由守卫：检查认证状态和 token 过期
+// Route guard: check authentication status and token expiration
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
 
-  // 检查 token 是否过期
+  // Check if token is expired
   if (authStore.isAuthenticated) {
     const isExpired = authStore.isTokenExpired()
     if (isExpired) {
-      console.log('Token expired, logging out...')
-      authStore.logout(false) // 不显示确认弹窗
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Token expired, logging out...')
+      }
+      authStore.logout(false) // Don't show confirmation dialog
       next('/login')
       return
     }

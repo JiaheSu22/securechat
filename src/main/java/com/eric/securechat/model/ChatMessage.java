@@ -3,23 +3,23 @@ package com.eric.securechat.model;
 import java.time.Instant;
 
 /**
- * Represents a message DTO (Data Transfer Object) for WebSocket communication.
- * This class needs to accommodate both text and file messages.
+ * WebSocket message DTO for real-time chat communication.
+ * Supports both text and file messages with encryption metadata.
  */
 public class ChatMessage {
-    // Renamed fields to match frontend payload for consistency
-    private String senderUsername; // Replaces 'from'
-    private String receiverUsername; // Replaces 'to'
-    private String encryptedContent; // Replaces 'content'
+    private String senderUsername;
+    private String receiverUsername;
+    private String encryptedContent;
 
-    // New fields to support file messages
-    private MessageType messageType; // Use an enum for type safety
+    private MessageType messageType;
     private String fileUrl;
     private String originalFilename;
     private String nonce;
     private Instant timestamp;
 
-    // Enum for message types
+    /**
+     * Enum for message types.
+     */
     public enum MessageType {
         TEXT, FILE
     }

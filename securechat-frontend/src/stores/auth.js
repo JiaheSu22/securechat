@@ -1,4 +1,4 @@
-// src/stores/auth.js
+// src/stores/auth.js - Authentication store using Pinia
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authService } from '@/services/authService'
@@ -9,7 +9,7 @@ import { exportPrivateKeysToFile } from '@/utils/keyExport'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token'))
-  // 修复语法错误：移除多余的括号
+  // Fix syntax error: remove extra parentheses
   const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
   const x25519PrivateKey = ref(localStorage.getItem('x25519PrivateKey'))
   const ed25519PrivateKey = ref(localStorage.getItem('ed25519PrivateKey'))
@@ -42,20 +42,20 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function register({ username, password, nickname }) {
     await sodium.ready;
-    // 1. 注册账号，获取 token
+    // 1. Register account and get token
       const registerRes = await authService.register({ username, password, nickname })
       const jwt = registerRes.data.token
       setToken(jwt)
-    // 2. 获取用户信息
+    // 2. Get user information
       const userInfoRes = await userService.getMe()
       setUser(userInfoRes.data)
-    // 3. 生成 X25519 和 Ed25519 密钥对
+    // 3. Generate X25519 and Ed25519 key pairs
     const x25519KeyPair = sodium.crypto_kx_keypair()
     const ed25519KeyPair = sodium.crypto_sign_keypair()
-    // 4. 上传公钥
+    // 4. Upload public keys
     await userService.uploadX25519Key({ x25519PublicKey: sodium.to_base64(x25519KeyPair.publicKey) })
     await userService.uploadEd25519Key({ ed25519PublicKey: sodium.to_base64(ed25519KeyPair.publicKey) })
-    // 5. 本地保存私钥
+    // 5. Save private keys locally
     setX25519PrivateKey(sodium.to_base64(x25519KeyPair.privateKey))
     setEd25519PrivateKey(sodium.to_base64(ed25519KeyPair.privateKey))
       return { success: true }
@@ -63,28 +63,28 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(username, password) {
     try {
-      // 1. 登录，获取 token
+      // 1. Login and get token
       const res = await authService.login({ username, password });
       const { token: jwt } = res.data;
       setToken(jwt);
-      // 2. 获取用户信息
+      // 2. Get user information
       const userInfoRes = await userService.getMe();
       setUser(userInfoRes.data);
-      // 3. 本地不生成密钥，只从 localStorage 读取私钥
-      // 如果你想支持多端同步密钥，这里可以加密存储/导入
+      // 3. Don't generate keys locally, only read private keys from localStorage
+      // If you want to support multi-device key sync, you can encrypt store/import here
       return { success: true };
     } catch (e) {
       return { success: false, message: e.response?.data?.message || 'Login failed' };
     }
   }
 
-  // 改进的退出登录函数
+  // Improved logout function
   async function logout(showConfirmDialog = true) {
-    // 检查是否有私钥需要保存
+    // Check if there are private keys that need to be saved
     const hasPrivateKeys = x25519PrivateKey.value || ed25519PrivateKey.value;
     
     if (showConfirmDialog && hasPrivateKeys) {
-      // 合并的确认弹窗：退出确认 + 私钥保存提醒
+      // Combined confirmation dialog: logout confirmation + private key save reminder
       const result = await new Promise((resolve) => {
         ElMessageBox.confirm(
           'You are about to log out. It is recommended to export your private keys for backup, otherwise they will be lost. Would you like to export your private keys before logging out?',
@@ -101,64 +101,64 @@ export const useAuthStore = defineStore('auth', () => {
           if (action === 'cancel') {
             resolve('logout_only');
           } else {
-            resolve('cancel'); // 右上角叉号取消退出
+            resolve('cancel'); // Top-right X button cancels logout
           }
         });
       });
 
       if (result === 'cancel') {
-        return false; // 用户取消退出，返回 false
+        return false; // User cancels logout, return false
       }
 
       if (result === 'export') {
-        // 导出私钥并下载文件
+        // Export private keys and download file
         const exportObj = { 
           x25519PrivateKey: x25519PrivateKey.value, 
           ed25519PrivateKey: ed25519PrivateKey.value 
         };
         
-        // 使用公共工具函数导出私钥
+        // Use common utility function to export private keys
         exportPrivateKeysToFile(exportObj, user.value?.username);
       }
     }
 
-    // 清理所有认证相关数据
+    // Clean all authentication-related data
     setToken(null)
     setUser(null)
     setX25519PrivateKey(null)
     setEd25519PrivateKey(null)
     
-    // 清理其他可能存在的认证相关数据
+    // Clean other potentially existing authentication-related data
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('x25519PrivateKey')
     localStorage.removeItem('ed25519PrivateKey')
     
-    // 清理 sessionStorage 中的相关数据
+    // Clean sessionStorage related data
     sessionStorage.removeItem('token')
     sessionStorage.removeItem('user')
     
-    return true; // 成功退出，返回 true
+    return true; // Successfully logged out, return true
   }
 
-  // 检查 token 是否过期
+  // Check if token is expired
   function isTokenExpired() {
     if (!token.value) return true;
     
     try {
-      // 解析 JWT token 获取过期时间
+      // Parse JWT token to get expiration time
       const payload = JSON.parse(atob(token.value.split('.')[1]));
-      const expirationTime = payload.exp * 1000; // 转换为毫秒
+      const expirationTime = payload.exp * 1000; // Convert to milliseconds
       const currentTime = Date.now();
       
       return currentTime >= expirationTime;
     } catch (e) {
-      // 如果解析失败，认为 token 无效
+      // If parsing fails, consider token invalid
       return true;
     }
   }
 
-  // 自动清理过期的 token
+  // Automatically clean expired tokens
   function cleanExpiredToken() {
     if (isTokenExpired()) {
       logout();

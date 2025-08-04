@@ -1,4 +1,4 @@
-<!-- src/views/RegisterView.vue -->
+<!-- RegisterView.vue - User registration page -->
 <template>
   <div class="register-container">
     <el-card class="register-card">
@@ -79,7 +79,7 @@ import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { User, Lock, MagicStick } from '@element-plus/icons-vue';
 import { ElNotification } from 'element-plus';
-import { useAuthStore } from '@/stores/auth'; // 直接静态导入
+import { useAuthStore } from '@/stores/auth'; // Direct static import
 
 const router = useRouter();
 const registerFormRef = ref(null);
@@ -92,7 +92,7 @@ const registerForm = reactive({
   confirmPassword: '',
 });
 
-// 自定义验证规则：确认密码
+// Custom validation rule: confirm password
 const validatePass = (rule, value, callback) => {
   if (value === '') {
     callback(new Error('Please input the password again'));
@@ -120,7 +120,7 @@ const handleRegister = async () => {
   await registerFormRef.value.validate(async (valid) => {
     if (valid) {
       loading.value = true;
-      // 调用 Pinia 的注册逻辑
+      // Call Pinia's registration logic
       const result = await authStore.register({
         username: registerForm.username,
         password: registerForm.password,
@@ -149,7 +149,7 @@ const handleRegister = async () => {
 </script>
 
 <style scoped>
-/* 样式与 LoginView 保持一致，但使用不同的类名以防冲突 */
+/* Styles consistent with LoginView but using different class names to avoid conflicts */
 .register-container {
   display: flex;
   justify-content: center;

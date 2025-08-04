@@ -9,30 +9,42 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for handling user-related operations including registration, profile management,
+ * and cryptographic key management for end-to-end encryption.
+ */
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    /**
+     * Constructor for UserService.
+     * 
+     * @param userRepository Repository for user data operations
+     * @param passwordEncoder Service for password encryption
+     */
     @Autowired
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
-
     /**
-     * 【已修改】注册一个新用户
+     * Registers a new user with validation and password encryption.
+     * Performs defensive validation to ensure data integrity.
+     * 
+     * @param registerRequest The registration request containing user credentials
+     * @return The created user entity
+     * @throws IllegalStateException if username is already taken
+     * @throws IllegalArgumentException if validation fails
      */
     @Transactional
     public User registerUser(RegisterRequest registerRequest) {
-        // 【防御性校验 1】在 Service 层手动校验，确保逻辑健壮
         validateRegistrationRequest(registerRequest);
 
-        // 【防御性校验 2】检查用户名是否存在
         if (userRepository.findByUsername(registerRequest.username()).isPresent()) {
-            // 这个异常现在会被 GlobalExceptionHandler 正确处理，并返回 409
             throw new IllegalStateException("Username already taken");
         }
 
@@ -45,24 +57,27 @@ public class UserService {
     }
 
     /**
-     * 【新增方法】用于手动校验注册请求的辅助方法
+     * Validates registration request data for completeness and security.
+     * Performs additional validation beyond standard @Valid annotations.
+     * 
+     * @param request The registration request to validate
+     * @throws IllegalArgumentException if validation fails
      */
     private void validateRegistrationRequest(RegisterRequest request) {
-        // 你可以在这里添加任何你认为重要的、不能单靠 @Valid 的校验
         if (request.password() == null || request.password().length() < 6) {
-            // 这个异常会被 GlobalExceptionHandler 正确处理，并返回 400
             throw new IllegalArgumentException("Password must be at least 6 characters long");
         }
         if (request.username() == null || request.username().trim().isEmpty()) {
             throw new IllegalArgumentException("Username cannot be blank");
         }
-        // ... 可以添加更多校验规则
     }
 
     /**
-     * 【新增方法】根据用户名获取用户公开信息
-     * @param username 用户名
-     * @return 包含用户ID、用户名和昵称的DTO
+     * Retrieves a user's public profile information by username.
+     * 
+     * @param username The username of the user to retrieve
+     * @return UserDto containing user's public information
+     * @throws IllegalArgumentException if user is not found
      */
     @Transactional(readOnly = true)
     public UserDto getUserProfile(String username) {
@@ -71,6 +86,13 @@ public class UserService {
         return new UserDto(user.getId(), user.getUsername(), user.getNickname());
     }
 
+    /**
+     * Updates a user's X25519 public key for end-to-end encryption.
+     * 
+     * @param username The username of the user to update
+     * @param x25519PublicKey The X25519 public key to set
+     * @throws IllegalStateException if user is not found
+     */
     @Transactional
     public void updateUserX25519Key(String username, String x25519PublicKey) {
         User user = userRepository.findByUsername(username)
@@ -79,6 +101,13 @@ public class UserService {
         userRepository.save(user);
     }
 
+    /**
+     * Updates a user's Ed25519 public key for digital signatures.
+     * 
+     * @param username The username of the user to update
+     * @param ed25519PublicKey The Ed25519 public key to set
+     * @throws IllegalStateException if user is not found
+     */
     @Transactional
     public void updateUserEd25519Key(String username, String ed25519PublicKey) {
         User user = userRepository.findByUsername(username)
@@ -87,6 +116,14 @@ public class UserService {
         userRepository.save(user);
     }
 
+    /**
+     * Retrieves a user's X25519 public key for encryption operations.
+     * 
+     * @param username The username of the user whose key to retrieve
+     * @return The user's X25519 public key
+     * @throws IllegalArgumentException if user is not found
+     * @throws IllegalStateException if user has not uploaded a key
+     */
     @Transactional(readOnly = true)
     public String getUserX25519Key(String username) {
         User user = userRepository.findByUsername(username)
@@ -97,6 +134,14 @@ public class UserService {
         return user.getX25519PublicKey();
     }
 
+    /**
+     * Retrieves a user's Ed25519 public key for signature verification.
+     * 
+     * @param username The username of the user whose key to retrieve
+     * @return The user's Ed25519 public key
+     * @throws IllegalArgumentException if user is not found
+     * @throws IllegalStateException if user has not uploaded a key
+     */
     @Transactional(readOnly = true)
     public String getUserEd25519Key(String username) {
         User user = userRepository.findByUsername(username)

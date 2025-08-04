@@ -9,64 +9,95 @@ import com.eric.securechat.model.User;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Service interface for managing friendship relationships between users.
+ * Provides functionality for friend requests, status management, and relationship queries.
+ */
 public interface FriendshipService {
 
     /**
-     * 【新增】获取当前用户收到的、所有待处理的好友请求
-     * @param currentUsername 当前登录用户的用户名
-     * @return 一个包含好友请求信息的 DTO 列表
+     * Retrieves all pending friend requests for the current user.
+     * 
+     * @param currentUsername The username of the current logged-in user
+     * @return List of pending friend request DTOs
      */
     List<FriendRequestViewDto> getPendingRequests(String currentUsername);
 
     /**
-     * 发送一个好友请求。
-     * @param requesterUsername 发起请求的用户名
-     * @param addresseeUsername 接收请求的用户名
-     * @return 创建的 Friendship 记录
-     * @throws Exception 如果用户不存在、已是好友、或请求已存在等
+     * Sends a friend request from one user to another.
+     * 
+     * @param requesterUsername The username of the user sending the request
+     * @param addresseeUsername The username of the user receiving the request
+     * @return The created friendship record
+     * @throws Exception if users don't exist, are already friends, or request already exists
      */
     Friendship sendRequest(String requesterUsername, String addresseeUsername) throws Exception;
 
     /**
-     * 接受一个好友请求。
-     * @param requesterUsername 发起原始请求的用户名
-     * @param addresseeUsername 接受请求的当前用户（即当初的接收者）
-     * @return 更新后的 Friendship 记录
-     * @throws Exception 如果请求不存在或状态不正确等
+     * Accepts a friend request.
+     * 
+     * @param requesterUsername The username of the user who sent the original request
+     * @param addresseeUsername The username of the current user accepting the request
+     * @return The updated friendship record
+     * @throws Exception if request doesn't exist or status is incorrect
      */
     Friendship acceptRequest(String requesterUsername, String addresseeUsername) throws Exception;
 
     /**
-     * 拒绝一个好友请求。
-     * @param requesterUsername 发起原始请求的用户名
-     * @param addresseeUsername 拒绝请求的当前用户（即当初的接收者）
-     * @return 更新后的 Friendship 记录
-     * @throws Exception 如果请求不存在或状态不正确等
+     * Declines a friend request.
+     * 
+     * @param requesterUsername The username of the user who sent the original request
+     * @param addresseeUsername The username of the current user declining the request
+     * @return The updated friendship record
+     * @throws Exception if request doesn't exist or status is incorrect
      */
     Friendship declineRequest(String requesterUsername, String addresseeUsername) throws Exception;
 
+    /**
+     * Retrieves the friend list for a user with friendship status.
+     * 
+     * @param username The username to get friends for
+     * @return List of friends with their status
+     */
     List<FriendStatusDto> getFriendsList(String username);
 
+    /**
+     * Removes a user from the current user's friend list.
+     * 
+     * @param currentUsername The current user's username
+     * @param friendUsername The friend's username to remove
+     * @return The updated friendship record
+     * @throws Exception if friendship doesn't exist or cannot be removed
+     */
     Friendship unfriend(String currentUsername, String friendUsername) throws Exception;
 
+    /**
+     * Blocks a user, preventing any interaction.
+     * 
+     * @param blockerUsername The username of the user doing the blocking
+     * @param blockedUsername The username of the user being blocked
+     * @return The updated friendship record
+     */
     Friendship blockUser(String blockerUsername, String blockedUsername);
 
     /**
-     * 解除对用户的拉黑。
-     * 只有执行拉黑的用户才能解除拉黑。
-     * @param currentUserUsername 执行解除拉黑操作的用户名 (即当初的拉黑者)
-     * @param blockedUsername 被拉黑的用户名
-     * @return 代表被删除关系的瞬时 Friendship 对象
-     * @throws Exception 如果关系不存在、状态不正确或无权操作
+     * Unblocks a previously blocked user.
+     * Only the user who performed the blocking can unblock.
+     * 
+     * @param currentUserUsername The username of the user performing the unblock operation
+     * @param blockedUsername The username of the user being unblocked
+     * @return The updated friendship record
+     * @throws Exception if relationship doesn't exist, status is incorrect, or no permission
      */
     Friendship unblockUser(String currentUserUsername, String blockedUsername) throws Exception;
 
     /**
-     * [工具方法] 查找两个用户之间的好友关系，不关心方向。
-     * 可供其他服务（如MessageService）调用来验证关系。
-     * @param user1 第一个用户
-     * @param user2 第二个用户
-     * @return 包含 Friendship 的 Optional, 如果不存在任何关系则为空
+     * Utility method to find friendship relationship between two users.
+     * Can be used by other services (like MessageService) to validate relationships.
+     * 
+     * @param user1 The first user
+     * @param user2 The second user
+     * @return Optional containing the friendship if it exists, empty otherwise
      */
     Optional<Friendship> findFriendshipRelation(User user1, User user2);
 }

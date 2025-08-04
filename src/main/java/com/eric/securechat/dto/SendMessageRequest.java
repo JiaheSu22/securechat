@@ -5,8 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 /**
- * DTO for a client request to send a new message.
- * Now implemented as a Record for conciseness and immutability.
+ * Request DTO for sending a new message.
+ * Contains message content and metadata with validation constraints.
  */
 public record SendMessageRequest(
         @NotBlank

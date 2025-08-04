@@ -23,9 +23,9 @@
 
     <!-- 文件 Appender -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>secure-chat.log</file>
+        <file>logs/secure-chat.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>secure-chat.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>logs/secure-chat.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>30</maxHistory>
         </rollingPolicy>
         <encoder>

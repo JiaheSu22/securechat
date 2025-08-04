@@ -1,4 +1,4 @@
-// src/services/fileService.js
+// src/services/fileService.js - File service
 import apiClient from './api';
 
 export const fileService = {

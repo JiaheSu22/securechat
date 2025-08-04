@@ -9,26 +9,34 @@ import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
 
+/**
+ * WebSocket Controller for handling real-time chat messages.
+ * Processes incoming WebSocket messages and forwards them to appropriate recipients.
+ * Uses Spring's STOMP messaging for secure message routing.
+ */
 @Controller
 public class ChatController {
 
     @Autowired
-    private SimpMessagingTemplate messagingTemplate; // Used to send messages
+    private SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Processes incoming chat messages via WebSocket.
+     * Securely identifies the sender using the WebSocket session principal.
+     * Forwards the message to the specified recipient's private queue.
+     * 
+     * @param chatMessage The chat message payload containing message details
+     * @param principal The authenticated user principal from the WebSocket session
+     */
     @MessageMapping("/chat")
     public void processMessage(@Payload ChatMessage chatMessage, Principal principal) {
-        // We can use the 'Principal' object from the WebSocket session to securely identify the sender.
-        // This prevents a client from spoofing the 'from' field.
         String senderUsername = principal.getName();
-        // Use the new setter to align with the updated ChatMessage class
         chatMessage.setSenderUsername(senderUsername);
 
-        // The destination for a specific user is typically "/user/{username}/queue/messages"
-        // Use the new getter for the recipient's username
         messagingTemplate.convertAndSendToUser(
-                chatMessage.getReceiverUsername(), // The recipient's username
-                "/queue/messages",                 // The specific queue on that user's channel
-                chatMessage                        // The payload
+                chatMessage.getReceiverUsername(),
+                "/queue/messages",
+                chatMessage
         );
     }
 }

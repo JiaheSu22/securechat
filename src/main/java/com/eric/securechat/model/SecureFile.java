@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Entity representing uploaded files in the secure chat system.
+ * Tracks file metadata and ownership information.
+ */
 @Entity
 @Table(name = "secure_files")
 public class SecureFile {
@@ -16,18 +20,35 @@ public class SecureFile {
     private String contentType;
     private long fileSize;
 
+    /**
+     * Unique storage path/filename on the server.
+     */
     @Column(unique = true, nullable = false)
-    private String storagePath; // 服务器上存储的唯一路径/文件名
+    private String storagePath;
 
+    /**
+     * User who uploaded the file.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploader_id", nullable = false)
     private User uploader;
 
     private Instant createdAt;
 
-    // Constructors, Getters, and Setters
+    /**
+     * Default constructor.
+     */
     public SecureFile() {}
 
+    /**
+     * Constructor for creating a new file record.
+     * 
+     * @param fileName Original filename
+     * @param contentType MIME type of the file
+     * @param fileSize Size of the file in bytes
+     * @param storagePath Server storage path
+     * @param uploader User who uploaded the file
+     */
     public SecureFile(String fileName, String contentType, long fileSize, String storagePath, User uploader) {
         this.fileName = fileName;
         this.contentType = contentType;
@@ -37,7 +58,7 @@ public class SecureFile {
         this.createdAt = Instant.now();
     }
 
-    // ... generate all getters and setters ...
+    // Getters and Setters
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
     public String getFileName() { return fileName; }

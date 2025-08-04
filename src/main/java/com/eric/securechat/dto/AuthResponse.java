@@ -1,5 +1,8 @@
 package com.eric.securechat.dto;
 
-// 我们也统一使用 record 来响应，这更一致
+/**
+ * Response DTO for authentication operations.
+ * Contains the JWT token for successful authentication.
+ */
 public record AuthResponse(String token) {
 }

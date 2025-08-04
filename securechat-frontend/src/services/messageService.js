@@ -1,12 +1,12 @@
-// src/services/messageService.js
+// src/services/messageService.js - Message service
 import apiClient from './api';
 
 export const messageService = {
-  // 发送消息
+  // Send message
   sendMessage(data) { // data: { receiverUsername, encryptedContent, messageType, fileUrl?, originalFilename? }
     return apiClient.post('/messages', data);
   },
-  // 获取与某用户的历史会话
+  // Get conversation history with a user
   getConversation(otherUsername) {
     return apiClient.get(`/messages/${otherUsername}`);
   }

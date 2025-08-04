@@ -1,12 +1,11 @@
-// src/main/java/com/eric/securechat/dto/RegisterRequest.java
 package com.eric.securechat.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * DTO for user registration.
- * Converted to a Record.
+ * Request DTO for user registration operations.
+ * Contains user credentials and profile information with validation constraints.
  */
 public record RegisterRequest(
         @NotBlank(message = "Username cannot be blank")

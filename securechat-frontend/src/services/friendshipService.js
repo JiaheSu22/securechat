@@ -1,4 +1,4 @@
-// src/services/friendshipService.js
+// src/services/friendshipService.js - Friendship service
 import apiClient from './api';
 
 export const friendshipService = {

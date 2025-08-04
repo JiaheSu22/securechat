@@ -4,7 +4,8 @@ import com.eric.securechat.model.FriendshipStatus;
 import java.util.UUID;
 
 /**
- * DTO for returning a user's info along with their friendship status.
+ * DTO for user information with friendship status.
+ * Contains user profile and cryptographic keys for secure communication.
  */
 public record FriendStatusDto(
         UUID id,
