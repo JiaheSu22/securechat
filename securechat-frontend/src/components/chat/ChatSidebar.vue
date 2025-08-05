@@ -5,8 +5,8 @@
     <div v-if="user" class="user-section">
       <div class="user-card">
         <div class="avatar-container">
-                     <div 
-             :style="{ backgroundColor: getAvatarColor(user) }" 
+                     <div
+             :style="{ backgroundColor: getAvatarColor(user) }"
              class="user-avatar"
            >
              <span class="avatar-text">{{ user.nickname[0].toUpperCase() }}</span>
@@ -16,8 +16,8 @@
           <h3 class="user-name">{{ user.nickname }}</h3>
           <p class="user-handle">@{{ user.username }}</p>
         </div>
-        <button 
-          @click="$emit('logout')" 
+        <button
+          @click="$emit('logout')"
           class="logout-button"
           title="Logout"
         >
@@ -35,15 +35,15 @@
           <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
           </svg>
-          <input 
-            v-model="internalSearchQuery" 
-            placeholder="Search contacts..." 
+          <input
+            v-model="internalSearchQuery"
+            placeholder="Search contacts..."
             class="search-input"
           />
         </div>
       </div>
-      <button 
-        @click="$emit('open-add-contact')" 
+      <button
+        @click="$emit('open-add-contact')"
         class="add-contact-btn"
         title="Add Contact"
       >
@@ -54,9 +54,9 @@
     </div>
 
     <!-- 好友请求区域 -->
-    <div 
+    <div
       v-if="friendRequests.length > 0"
-      class="friend-requests-card" 
+      class="friend-requests-card"
       @click="$emit('open-friend-requests')"
     >
       <div class="request-icon">
@@ -74,7 +74,7 @@
         <h4>Contacts</h4>
         <span class="contact-count">{{ contacts.length }}</span>
       </div>
-      
+
       <div class="contacts-list">
         <div
           v-for="contact in contacts"
@@ -83,8 +83,8 @@
           @click="handleContactClick(contact)"
         >
           <div class="contact-avatar-container">
-            <div 
-              :style="{ backgroundColor: getAvatarColor(contact) }" 
+            <div
+              :style="{ backgroundColor: getAvatarColor(contact) }"
               class="contact-avatar"
             >
               <span>{{ contact.nickname[0].toUpperCase() }}</span>
@@ -95,21 +95,21 @@
               </svg>
             </div>
           </div>
-          
+
           <div class="contact-content">
             <div class="contact-info">
               <h5 class="contact-name">{{ contact.nickname }}</h5>
               <p class="contact-preview">{{ getLastMessageText(contact.username) }}</p>
             </div>
-            
+
             <div class="contact-meta">
               <div v-if="unreadMap[contact.username] > 0" class="unread-badge">
                 {{ unreadMap[contact.username] }}
               </div>
-              
+
               <!-- More actions button -->
               <div class="contact-actions" @click.stop>
-                <button 
+                <button
                   @click="toggleContactMenu(contact.id)"
                   class="more-btn"
                 >
@@ -117,23 +117,23 @@
                     <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path>
                   </svg>
                 </button>
-                
+
                 <!-- Dropdown menu -->
-                <div 
+                <div
                   v-if="activeContactMenu === contact.id"
                   class="contact-menu"
                 >
-                  <button 
+                  <button
                     v-if="contact.status !== 'BLOCKED'"
                     @click="$emit('contact-command', { action: 'block', user: contact })"
-                    class="menu-item danger"
+                    class="menu-item warning"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                     </svg>
                     Block User
                   </button>
-                  <button 
+                  <button
                     v-else
                     @click="$emit('contact-command', { action: 'unblock', user: contact })"
                     class="menu-item"
@@ -143,13 +143,12 @@
                     </svg>
                     Unblock User
                   </button>
-                  <button 
+                  <button
                     @click="$emit('contact-command', { action: 'delete', user: contact })"
                     class="menu-item danger"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6"></path>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                     </svg>
                     Delete Contact
                   </button>
@@ -163,10 +162,10 @@
 
     <!-- Key management -->
     <div class="key-management-section">
-      <KeyManagement 
+      <KeyManagement
         :is-dark-mode="isDarkMode"
-        @export-keys="$emit('export-keys')" 
-        @import-keys="$emit('import-keys', $event)" 
+        @export-keys="$emit('export-keys')"
+        @import-keys="$emit('import-keys', $event)"
       />
     </div>
   </div>
@@ -271,7 +270,7 @@ onUnmounted(() => {
 }
 
 .user-avatar {
-  @apply w-12 h-12 rounded-2xl flex items-center justify-center text-white font-semibold text-lg relative overflow-hidden;
+  @apply w-10 h-10 rounded-2xl flex items-center justify-center text-white font-semibold relative overflow-hidden;
   box-shadow: var(--shadow-soft);
 }
 
@@ -448,7 +447,11 @@ onUnmounted(() => {
 }
 
 .menu-item {
-  @apply w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-200 transition-colors duration-150 flex items-center space-x-2;
+  @apply w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-200 transition-colors duration-150 flex items-center space-x-3;
+}
+
+.menu-item.warning {
+  @apply text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900/20;
 }
 
 .menu-item.danger {
@@ -457,7 +460,7 @@ onUnmounted(() => {
 
 /* 密钥管理区域 */
 .key-management-section {
-  @apply p-4 border-t border-gray-100/50 dark:border-dark-200/50;
+  @apply p-5 border-t border-gray-100/50 dark:border-dark-200/50;
 }
 
 /* 滚动条样式 */

@@ -40,8 +40,8 @@
                   @keydown.enter="handleSend"
                   ref="usernameInput"
                 />
-                <button 
-                  v-if="addFriendUsername" 
+                <button
+                  v-if="addFriendUsername"
                   @click="addFriendUsername = ''"
                   class="clear-btn"
                   type="button"
@@ -51,18 +51,18 @@
                   </svg>
                 </button>
               </div>
-              <p class="input-hint">Enter the complete username, e.g. @username</p>
+              <p class="input-hint">Enter the complete username</p>
             </div>
           </div>
 
           <div class="modal-footer">
-            <button 
-              @click="$emit('update:visible', false)" 
+            <button
+              @click="$emit('update:visible', false)"
               class="cancel-btn"
             >
               Cancel
             </button>
-            <button 
+            <button
               @click="handleSend"
               :disabled="!addFriendUsername.trim()"
               class="submit-btn"
@@ -106,7 +106,7 @@ const handleOverlayClick = () => {
 // Send friend request
 const handleSend = async () => {
   if (!addFriendUsername.value.trim() || isLoading.value) return;
-  
+
   isLoading.value = true;
   try {
     await emit('send-friend-request', addFriendUsername.value.trim());
@@ -260,15 +260,15 @@ watch(() => props.visible, (newVisible) => {
   .modal-container {
     @apply mx-4 w-auto;
   }
-  
+
   .modal-header {
     @apply p-4;
   }
-  
+
   .modal-body {
     @apply p-4;
   }
-  
+
   .modal-footer {
     @apply p-4;
   }

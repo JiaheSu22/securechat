@@ -47,7 +47,7 @@
                 <!-- File messages -->
                 <div v-if="msg.messageType === 'FILE'" class="file-message">
                   <div class="file-content">
-                    <div class="file-icon">
+                    <div :class="['file-icon', getMessageClass(msg.sender)]">
                       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                       </svg>
@@ -294,41 +294,19 @@ const onFileChange = (e) => {
 
 // Scroll to bottom - use scroll anchor method with fallback
 const scrollToBottom = () => {
-  console.log('🔽 scrollToBottom called');
-  console.log('📍 scrollAnchor.value:', scrollAnchor.value);
-  console.log('📦 messageContainerRef.value:', messageContainerRef.value);
-  
   // Method 1: Try scroll anchor
   if (scrollAnchor.value) {
-    console.log('✅ scrollAnchor exists, calling scrollIntoView');
     scrollAnchor.value.scrollIntoView({ 
       behavior: 'instant',
       block: 'end'
     });
-  } else {
-    console.log('❌ scrollAnchor does not exist');
   }
   
   // Method 2: Fallback to manual scroll
   if (messageContainerRef.value) {
     const container = messageContainerRef.value;
-    console.log('🔄 Fallback: Setting scrollTop manually');
-    console.log('📊 Before manual scroll - scrollTop:', container.scrollTop);
-    console.log('📊 Before manual scroll - scrollHeight:', container.scrollHeight);
     container.scrollTop = container.scrollHeight;
-    console.log('📊 After manual scroll - scrollTop:', container.scrollTop);
   }
-  
-  // Check final position after both methods
-  nextTick(() => {
-    if (messageContainerRef.value) {
-      const container = messageContainerRef.value;
-      console.log('📊 Final - scrollTop:', container.scrollTop);
-      console.log('📊 Final - scrollHeight:', container.scrollHeight);
-      console.log('📊 Final - clientHeight:', container.clientHeight);
-      console.log('📊 Final - is at bottom?', container.scrollTop + container.clientHeight >= container.scrollHeight - 1);
-    }
-  });
 };
 
 // Smooth scroll to bottom (for new messages)
@@ -343,19 +321,11 @@ const smoothScrollToBottom = () => {
 
 // Listen for message changes, auto scroll
 watch(() => props.messages, (newMessages, oldMessages) => {
-  console.log('👁️ Messages watch triggered');
-  console.log('📨 New messages length:', newMessages?.length);
-  console.log('📨 Old messages length:', oldMessages?.length);
-  
   // Always scroll to bottom when messages change
   if (newMessages && newMessages.length > 0) {
-    console.log('🔄 Messages exist, scheduling scroll');
     nextTick(() => {
-      console.log('⏰ nextTick in messages watch - calling scrollToBottom');
       scrollToBottom();
     });
-  } else {
-    console.log('❌ No messages to scroll to');
   }
 }, { deep: true, immediate: true });
 
@@ -365,16 +335,10 @@ watch(() => props.newMessage, () => {
 });
 
 // Listen for chat target changes to scroll to bottom
-watch(() => props.currentChatTarget, (newTarget, oldTarget) => {
-  console.log('🎯 Chat target changed');
-  console.log('👤 New target:', newTarget?.nickname);
-  console.log('👤 Old target:', oldTarget?.nickname);
-  
+watch(() => props.currentChatTarget, (newTarget) => {
   if (newTarget) {
-    console.log('🔄 New target exists, scheduling scroll');
     // Scroll to bottom when switching to a different chat
     nextTick(() => {
-      console.log('⏰ nextTick in chat target watch - calling scrollToBottom');
       scrollToBottom();
     });
   }
@@ -387,14 +351,7 @@ const triggerFileInput = () => {
 
 // Scroll to bottom after component mount
 onMounted(() => {
-  console.log('🚀 ChatWindow mounted');
-  console.log('📦 messageContainerRef.value:', messageContainerRef.value);
-  console.log('📍 scrollAnchor.value:', scrollAnchor.value);
-  
   nextTick(() => {
-    console.log('⏰ nextTick in onMounted - calling scrollToBottom');
-    console.log('📦 After nextTick - messageContainerRef.value:', messageContainerRef.value);
-    console.log('📍 After nextTick - scrollAnchor.value:', scrollAnchor.value);
     scrollToBottom();
   });
 });
@@ -546,6 +503,14 @@ defineExpose({
   @apply flex-shrink-0 p-2 bg-blue-500/10 text-blue-500 rounded-xl;
 }
 
+.file-icon.sent {
+  @apply bg-white/20 text-white;
+}
+
+.file-icon.received {
+  @apply bg-blue-500/10 text-blue-500;
+}
+
 .file-details {
   @apply flex-1 min-w-0;
 }
@@ -686,6 +651,25 @@ defineExpose({
 
 
 /* Mobile responsive */
+@media (max-width: 1023px) {
+  .chat-window {
+    height: calc(100vh - 80px); /* Subtract mobile header height */
+    max-height: calc(100vh - 80px);
+    overflow: hidden;
+  }
+  
+  .messages-container {
+    flex: 1;
+    min-height: 0; /* Important for flex child overflow */
+    overflow: hidden;
+  }
+  
+  .messages-list {
+    height: 100%;
+    overflow-y: auto;
+  }
+}
+
 @media (max-width: 768px) {
   .messages-list {
     @apply px-4 py-3;
@@ -693,6 +677,7 @@ defineExpose({
   
   .input-area {
     @apply p-4;
+    flex-shrink: 0; /* Prevent input area from shrinking */
   }
   
   .message-bubble-container {

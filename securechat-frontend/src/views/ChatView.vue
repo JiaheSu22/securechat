@@ -12,7 +12,7 @@
         @click="toggleDarkMode"
         class="fixed top-4 right-4 z-50 p-3 rounded-2xl glass-effect shadow-soft hover:shadow-float transition-all duration-200"
       >
-        <svg v-if="!isDarkMode" class="w-5 h-5 text-gray-600 hover:text-yellow-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg v-if="!isDarkMode" class="w-5 h-5 text-gray-600 hover:text-purple-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
         </svg>
         <svg v-else class="w-5 h-5 text-gray-300 hover:text-yellow-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -46,15 +46,18 @@
       <!-- Right chat area -->
       <div class="chat-main-container">
         <!-- Mobile header -->
-        <div v-if="isMobile && currentChatTarget" class="mobile-header">
-          <button @click="sidebarVisible = true" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+        <div v-if="isMobile" class="mobile-header">
+          <button @click="sidebarVisible = true" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-gray-700 dark:text-gray-300">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
             </svg>
           </button>
-          <div class="flex-1 text-center">
+          <div v-if="currentChatTarget" class="flex-1 text-center">
             <h2 class="font-semibold text-gray-900 dark:text-gray-100">{{ currentChatTarget.nickname }}</h2>
             <p class="text-sm text-gray-500 dark:text-gray-400">@{{ currentChatTarget.username }}</p>
+          </div>
+          <div v-else class="flex-1 text-center">
+            <h2 class="font-semibold text-gray-900 dark:text-gray-100">Secure Chat</h2>
           </div>
           <div class="w-10"></div> <!-- Spacer for symmetry -->
         </div>
@@ -68,6 +71,7 @@
           :can-send-message="canSendMessage"
           :get-message-class="getMessageClass"
           :get-download-btn-style="getDownloadBtnStyle"
+          :get-avatar-color="getAvatarColor"
           :is-dark-mode="isDarkMode"
           :is-mobile="isMobile"
           v-model:newMessage="newMessage"
@@ -363,6 +367,9 @@ const connectWebSocket = () => {
             lastMessageMap.value[msgObj.senderUsername] = messageObject;
           }
           
+          // Move the sender to the top of the contact list
+          moveContactToTop(msgObj.senderUsername);
+          
           if (!currentChatTarget.value || msgObj.senderUsername !== currentChatTarget.value.username) {
             unreadMap.value[msgObj.senderUsername] = (unreadMap.value[msgObj.senderUsername] || 0) + 1;
             ElNotification({ title: 'New Message', message: `From ${msgObj.senderUsername}`, type: 'info' });
@@ -433,6 +440,7 @@ onMounted(async () => {
 
     await refreshFriendData();
     await loadLastMessagesForAllContacts();
+    sortContactList(); // Sort once after all data is loaded
     connectWebSocket();
   }
 });
@@ -440,14 +448,8 @@ onMounted(async () => {
 
 // --- Event Handlers ---
 const selectChat = async (user) => {
-  console.log('🎯 selectChat called for user:', user.nickname);
-  
-  if (currentChatTarget.value?.id === user.id) {
-    console.log('❌ Same user already selected, skipping');
-    return;
-  }
+  if (currentChatTarget.value?.id === user.id) return;
 
-  console.log('🔄 Setting new chat target and clearing messages');
   currentChatTarget.value = user;
   messages.value = [];
   unreadMap.value[user.username] = 0;
@@ -467,10 +469,8 @@ const selectChat = async (user) => {
   sessionKeyMap.value[user.username] = sessionKey;
   
   try {
-    console.log('📡 Fetching conversation for user:', user.username);
     const res = await messageService.getConversation(user.username);
     let hasHistoryMessages = res.data && res.data.length > 0;
-    console.log('📨 Received', res.data?.length || 0, 'messages from server');
     
     for (const msg of res.data) {
       let text = '[Decryption Failed]';
@@ -499,9 +499,7 @@ const selectChat = async (user) => {
     }
     
     // Force scroll to bottom after all messages are loaded
-    console.log('📜 All messages loaded, total count:', messages.value.length);
     await nextTick();
-    console.log('⏰ nextTick completed in selectChat, calling scrollToBottom');
     scrollToBottom();
   } catch (e) {
     // If the user is blocked, don't show error - they just can't see history
@@ -551,6 +549,10 @@ const sendTextMessage = async () => {
         if (!lastMessageMap.value[currentChatTarget.value.username] || new Date(textMessageObj.timestamp) > new Date(lastMessageMap.value[currentChatTarget.value.username].timestamp)) {
             lastMessageMap.value[currentChatTarget.value.username] = textMessageObj;
         }
+        
+        // Move current chat target to top of contact list
+        moveContactToTop(currentChatTarget.value.username);
+        
         newMessage.value = '';
         // Ensure scrolling happens after message is added
         nextTick(() => {
@@ -611,6 +613,10 @@ const sendFile = async () => {
     if (!lastMessageMap.value[currentChatTarget.value.username] || new Date(fileMessageObj.timestamp) > new Date(lastMessageMap.value[currentChatTarget.value.username].timestamp)) {
         lastMessageMap.value[currentChatTarget.value.username] = fileMessageObj;
     }
+    
+    // Move current chat target to top of contact list
+    moveContactToTop(currentChatTarget.value.username);
+    
     selectedFile.value = null;
     newMessage.value = '';
     // Ensure scrolling happens after message is added
@@ -960,15 +966,44 @@ function getDownloadBtnStyle(msg) {
 }
 
 // --- Utils ---
-const scrollToBottom = () => {
-    console.log('🔽 ChatView scrollToBottom called');
-    console.log('📦 chatWindowRef.value:', chatWindowRef.value);
+const moveContactToTop = (senderUsername) => {
+  const contactIndex = contactList.value.findIndex(contact => contact.username === senderUsername);
+  if (contactIndex > 0) { // Only move if not already at top (index > 0)
+    const contact = contactList.value[contactIndex];
     
+    // Don't move blocked users to top
+    if (contact.status === 'BLOCKED') {
+      return;
+    }
+    
+    // Remove from current position and add to beginning
+    contactList.value.splice(contactIndex, 1);
+    contactList.value.unshift(contact);
+  }
+};
+
+const sortContactList = () => {
+  contactList.value.sort((a, b) => {
+    // Always keep blocked users at bottom
+    if (a.status === 'BLOCKED' && b.status !== 'BLOCKED') return 1;
+    if (b.status === 'BLOCKED' && a.status !== 'BLOCKED') return -1;
+    if (a.status === 'BLOCKED' && b.status === 'BLOCKED') return 0;
+    
+    // Sort by last message timestamp (most recent first)
+    const aLastMsg = lastMessageMap.value[a.username];
+    const bLastMsg = lastMessageMap.value[b.username];
+    
+    if (!aLastMsg && !bLastMsg) return 0;
+    if (!aLastMsg) return 1;
+    if (!bLastMsg) return -1;
+    
+    return new Date(bLastMsg.timestamp) - new Date(aLastMsg.timestamp);
+  });
+};
+
+const scrollToBottom = () => {
     if(chatWindowRef.value) {
-        console.log('✅ chatWindowRef exists, calling child scrollToBottom');
         chatWindowRef.value.scrollToBottom();
-    } else {
-        console.log('❌ chatWindowRef does not exist');
     }
 };
 
@@ -1001,11 +1036,21 @@ const scrollToBottom = () => {
 /* Chat main container */
 .chat-main-container {
   @apply flex-1 flex flex-col min-w-0;
+  height: 100vh;
+}
+
+@media (max-width: 1023px) {
+  .chat-main-container {
+    height: 100vh;
+    overflow: hidden; /* Prevent scrolling on the container */
+  }
 }
 
 /* Mobile header */
 .mobile-header {
   @apply flex items-center p-4 bg-white/80 dark:bg-dark-100/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-dark-200/50 lg:hidden;
+  min-height: 80px; /* Ensure consistent height */
+  flex-shrink: 0; /* Prevent header from shrinking */
 }
 
 /* Responsive design */
