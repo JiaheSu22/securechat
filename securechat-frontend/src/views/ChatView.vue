@@ -1,47 +1,96 @@
-<!-- ChatView.vue - Refactored Main View -->
+<!-- ChatView.vue - Modern Chat Interface -->
 <template>
-  <div class="main-layout">
-    <!-- Left sidebar -->
-    <ChatSidebar
-      :user="authStore.user"
-      :contacts="filteredContactList"
-      :friend-requests="friendRequests"
-      :current-chat-target="currentChatTarget"
-      :unread-map="unreadMap"
-      :search-query="searchQuery"
-      :get-last-message-text="getLastMessageText"
-      :get-avatar-color="getAvatarColor"
-      @logout="handleLogout"
-      @open-add-contact="addContactDialogVisible = true"
-      @open-friend-requests="friendRequestsDialogVisible = true"
-      @select-chat="selectChat"
-      @contact-command="handleContactCommand"
-      @update:searchQuery="searchQuery = $event"
-      @import-keys="importPrivateKeys"
-    />
+  <div :class="['chat-app', { 'dark': isDarkMode }]" class="h-screen w-screen overflow-hidden">
+    <!-- Background decoration -->
+    <div class="absolute inset-0 bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20 dark:from-dark-50 dark:via-slate-900 dark:to-purple-900/20"></div>
+    <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-blue-50/10 to-purple-50/10 dark:from-transparent dark:via-slate-800/10 dark:to-purple-900/10"></div>
+    
+    <!-- Main container -->
+    <div class="relative z-10 flex h-full">
+      <!-- Dark mode toggle button -->
+      <button 
+        @click="toggleDarkMode"
+        class="fixed top-4 right-4 z-50 p-3 rounded-2xl glass-effect shadow-soft hover:shadow-float transition-all duration-200"
+      >
+        <svg v-if="!isDarkMode" class="w-5 h-5 text-gray-600 hover:text-yellow-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+        </svg>
+        <svg v-else class="w-5 h-5 text-gray-300 hover:text-yellow-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+        </svg>
+      </button>
 
-    <!-- Right main area: Chat window -->
-    <ChatWindow
-      ref="chatWindowRef"
-      :current-chat-target="currentChatTarget"
-      :messages="messages"
+      <!-- Left sidebar - hideable on mobile -->
+      <div :class="['sidebar-container', { 'sidebar-hidden': !sidebarVisible && isMobile }]">
+        <ChatSidebar
+          :user="authStore.user"
+          :contacts="filteredContactList"
+          :friend-requests="friendRequests"
+          :current-chat-target="currentChatTarget"
+          :unread-map="unreadMap"
+          :search-query="searchQuery"
+          :get-last-message-text="getLastMessageText"
+          :get-avatar-color="getAvatarColor"
+          :is-dark-mode="isDarkMode"
+          @logout="handleLogout"
+          @open-add-contact="addContactDialogVisible = true"
+          @open-friend-requests="friendRequestsDialogVisible = true"
+          @select-chat="selectChat"
+          @contact-command="handleContactCommand"
+          @update:searchQuery="searchQuery = $event"
+          @import-keys="importPrivateKeys"
+          @mobile-chat-selected="handleMobileChatSelected"
+        />
+      </div>
 
-      :selected-file="selectedFile"
-      :is-chat-blocked="isChatBlocked"
-      :can-send-message="canSendMessage"
-      :get-message-class="getMessageClass"
-      :get-download-btn-style="getDownloadBtnStyle"
-      v-model:newMessage="newMessage"
-      @send-message="handleSend"
-      @attach-file="handleAttachFile"
-      @remove-attachment="selectedFile = null"
-      @file-changed="onFileChange"
-      @download-file="handleFileDownload"
-    />
+      <!-- Right chat area -->
+      <div class="chat-main-container">
+        <!-- Mobile header -->
+        <div v-if="isMobile && currentChatTarget" class="mobile-header">
+          <button @click="sidebarVisible = true" class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+          <div class="flex-1 text-center">
+            <h2 class="font-semibold text-gray-900 dark:text-gray-100">{{ currentChatTarget.nickname }}</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">@{{ currentChatTarget.username }}</p>
+          </div>
+          <div class="w-10"></div> <!-- Spacer for symmetry -->
+        </div>
+
+        <ChatWindow
+          ref="chatWindowRef"
+          :current-chat-target="currentChatTarget"
+          :messages="messages"
+          :selected-file="selectedFile"
+          :is-chat-blocked="isChatBlocked"
+          :can-send-message="canSendMessage"
+          :get-message-class="getMessageClass"
+          :get-download-btn-style="getDownloadBtnStyle"
+          :is-dark-mode="isDarkMode"
+          :is-mobile="isMobile"
+          v-model:newMessage="newMessage"
+          @send-message="handleSend"
+          @attach-file="handleAttachFile"
+          @remove-attachment="selectedFile = null"
+          @file-changed="onFileChange"
+          @download-file="handleFileDownload"
+        />
+      </div>
+
+      <!-- Mobile overlay -->
+      <div 
+        v-if="isMobile && sidebarVisible" 
+        @click="sidebarVisible = false"
+        class="fixed inset-0 bg-black/20 z-30 lg:hidden"
+      ></div>
+    </div>
 
     <!-- Dialogs -->
     <AddContactDialog
       v-model:visible="addContactDialogVisible"
+      :is-dark-mode="isDarkMode"
       @send-friend-request="handleSendFriendRequest"
     />
 
@@ -49,9 +98,149 @@
       v-model:visible="friendRequestsDialogVisible"
       :requests="friendRequests"
       :get-avatar-color="getAvatarColor"
+      :is-dark-mode="isDarkMode"
       @accept-request="handleAcceptRequest"
       @decline-request="handleDeclineRequest"
     />
+
+    <!-- Custom Logout Dialog -->
+    <transition name="modal-overlay">
+      <div v-if="showLogoutDialog" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click="closeLogoutDialog">
+        <transition name="modal-content">
+          <div v-if="showLogoutDialog" class="w-full max-w-md bg-white dark:bg-dark-100 rounded-3xl shadow-float overflow-hidden" @click.stop>
+            <!-- Header -->
+            <div class="flex items-center p-6 border-b border-gray-100/50 dark:border-dark-200/50">
+              <div class="p-3 rounded-2xl bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+              </div>
+              <div class="flex-1 ml-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Confirm Logout</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Choose your logout option</p>
+              </div>
+              <button @click="closeLogoutDialog" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-200 rounded-xl transition-colors duration-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6">
+              <div class="flex items-center space-x-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200/50 dark:border-yellow-800/50 rounded-2xl text-yellow-800 dark:text-yellow-200 mb-6">
+                <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-sm">Make sure to save your private keys before logging out. They cannot be recovered if lost!</p>
+              </div>
+
+              <p class="text-gray-600 dark:text-gray-400 text-sm mb-6">
+                You are about to logout. Your private keys are stored locally and will be needed to decrypt your messages when you login again.
+              </p>
+            </div>
+
+            <!-- Footer -->
+            <div class="flex items-center justify-end space-x-3 p-6 bg-gray-50 dark:bg-dark-200/50 border-t border-gray-100/50 dark:border-dark-200/50">
+              <button 
+                @click="handleLogoutOnly" 
+                :disabled="isLoggingOut"
+                class="flex items-center space-x-2 px-6 py-2.5 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 dark:disabled:bg-dark-300 text-white disabled:text-gray-500 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 active:scale-95 disabled:transform-none disabled:cursor-not-allowed"
+                style="box-shadow: var(--shadow-soft);"
+              >
+                <svg v-if="isLoggingOut" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Logout Only</span>
+              </button>
+              <button 
+                @click="handleLogoutAndSaveKeys" 
+                :disabled="isLoggingOut"
+                class="flex items-center space-x-2 px-6 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-dark-300 text-white disabled:text-gray-500 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 active:scale-95 disabled:transform-none disabled:cursor-not-allowed"
+                style="box-shadow: var(--shadow-soft);"
+              >
+                <svg v-if="isLoggingOut" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span>Logout & Save Keys</span>
+              </button>
+            </div>
+          </div>
+        </transition>
+      </div>
+    </transition>
+
+    <!-- Custom Delete Confirmation Dialog -->
+    <transition name="modal-overlay">
+      <div v-if="showDeleteDialog" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" @click="closeDeleteDialog">
+        <transition name="modal-content">
+          <div v-if="showDeleteDialog" class="w-full max-w-md bg-white dark:bg-dark-100 rounded-3xl shadow-float overflow-hidden" @click.stop>
+            <!-- Header -->
+            <div class="flex items-center p-6 border-b border-gray-100/50 dark:border-dark-200/50">
+              <div class="p-3 rounded-2xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+              </div>
+              <div class="flex-1 ml-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete Contact</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">This action cannot be undone</p>
+              </div>
+              <button @click="closeDeleteDialog" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-200 rounded-xl transition-colors duration-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6">
+              <div class="flex items-center space-x-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200/50 dark:border-red-800/50 rounded-2xl text-red-800 dark:text-red-200 mb-6">
+                <svg class="w-6 h-6 text-red-600 dark:text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+                <p class="text-sm font-medium">This will permanently delete your conversation history with this contact.</p>
+              </div>
+
+              <p class="text-gray-600 dark:text-gray-400 text-sm" v-if="contactToDelete">
+                Are you sure you want to delete <strong>{{ contactToDelete.nickname }}</strong>? All your messages and shared files will be permanently removed.
+              </p>
+            </div>
+
+            <!-- Footer -->
+            <div class="flex items-center justify-end space-x-3 p-6 bg-gray-50 dark:bg-dark-200/50 border-t border-gray-100/50 dark:border-dark-200/50">
+              <button 
+                @click="closeDeleteDialog" 
+                :disabled="isDeletingContact"
+                class="px-6 py-2.5 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-200 rounded-xl font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button 
+                @click="confirmDeleteContact" 
+                :disabled="isDeletingContact"
+                class="flex items-center space-x-2 px-6 py-2.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 dark:disabled:bg-dark-300 text-white disabled:text-gray-500 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 active:scale-95 disabled:transform-none disabled:cursor-not-allowed"
+                style="box-shadow: var(--shadow-soft);"
+              >
+                <svg v-if="isDeletingContact" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+                <span>Delete Contact</span>
+              </button>
+            </div>
+          </div>
+        </transition>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -59,7 +248,7 @@
 import { ref, onMounted, nextTick, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { ElMessageBox, ElNotification, ElMessage } from 'element-plus';
+import { ElNotification, ElMessage } from 'element-plus';
 import { friendshipService } from '@/services/friendshipService';
 import { Client } from '@stomp/stompjs';
 import sodium from 'libsodium-wrappers';
@@ -94,6 +283,11 @@ const friendRequestsDialogVisible = ref(false);
 
 // --- Child component refs ---
 const chatWindowRef = ref(null);
+
+// --- UI State Management ---
+const isDarkMode = ref(localStorage.getItem('darkMode') === 'true' || false);
+const isMobile = ref(window.innerWidth < 1024);
+const sidebarVisible = ref(!isMobile.value);
 
 // --- Computed Properties ---
 const filteredContactList = computed(() => {
@@ -189,8 +383,40 @@ const connectWebSocket = () => {
   stompClient.value = client;
 };
 
+// --- UI Event Handlers ---
+const toggleDarkMode = () => {
+  isDarkMode.value = !isDarkMode.value;
+  localStorage.setItem('darkMode', isDarkMode.value.toString());
+  if (isDarkMode.value) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+};
+
+const handleResize = () => {
+  isMobile.value = window.innerWidth < 1024;
+  if (!isMobile.value) {
+    sidebarVisible.value = true;
+  }
+};
+
+const handleMobileChatSelected = () => {
+  if (isMobile.value) {
+    sidebarVisible.value = false;
+  }
+};
+
 // --- Lifecycle Hooks ---
 onMounted(async () => {
+  // Set initial dark mode state
+  if (isDarkMode.value) {
+    document.documentElement.classList.add('dark');
+  }
+  
+  // Listen for window resize
+  window.addEventListener('resize', handleResize);
+  
   if (authStore.isAuthenticated) {
     if (authStore.isTokenExpired()) {
       await authStore.logout(false);
@@ -214,8 +440,14 @@ onMounted(async () => {
 
 // --- Event Handlers ---
 const selectChat = async (user) => {
-  if (currentChatTarget.value?.id === user.id) return;
+  console.log('🎯 selectChat called for user:', user.nickname);
+  
+  if (currentChatTarget.value?.id === user.id) {
+    console.log('❌ Same user already selected, skipping');
+    return;
+  }
 
+  console.log('🔄 Setting new chat target and clearing messages');
   currentChatTarget.value = user;
   messages.value = [];
   unreadMap.value[user.username] = 0;
@@ -235,8 +467,10 @@ const selectChat = async (user) => {
   sessionKeyMap.value[user.username] = sessionKey;
   
   try {
+    console.log('📡 Fetching conversation for user:', user.username);
     const res = await messageService.getConversation(user.username);
     let hasHistoryMessages = res.data && res.data.length > 0;
+    console.log('📨 Received', res.data?.length || 0, 'messages from server');
     
     for (const msg of res.data) {
       let text = '[Decryption Failed]';
@@ -264,9 +498,21 @@ const selectChat = async (user) => {
       messages.value.push({ id: 'system-no-keys', text: 'Import your private keys to view encrypted message history.', sender: 'system', encrypted: false });
     }
     
+    // Force scroll to bottom after all messages are loaded
+    console.log('📜 All messages loaded, total count:', messages.value.length);
+    await nextTick();
+    console.log('⏰ nextTick completed in selectChat, calling scrollToBottom');
     scrollToBottom();
   } catch (e) {
-    messages.value.push({ id: 'system-history-error', text: '[Failed to load history messages]', sender: 'system' });
+    // If the user is blocked, don't show error - they just can't see history
+    if (user.status === 'BLOCKED') {
+      messages.value.push({ id: 'system-blocked-history', text: 'Previous message history is not available for blocked contacts.', sender: 'system' });
+    } else {
+      messages.value.push({ id: 'system-history-error', text: '[Failed to load history messages]', sender: 'system' });
+    }
+    // Still scroll to bottom even if loading failed
+    await nextTick();
+    scrollToBottom();
   }
 };
 
@@ -306,7 +552,10 @@ const sendTextMessage = async () => {
             lastMessageMap.value[currentChatTarget.value.username] = textMessageObj;
         }
         newMessage.value = '';
-        scrollToBottom();
+        // Ensure scrolling happens after message is added
+        nextTick(() => {
+          scrollToBottom();
+        });
     } catch (e) {
         ElMessage.error(e?.response?.data?.message || 'Message sending failed.');
     }
@@ -364,7 +613,10 @@ const sendFile = async () => {
     }
     selectedFile.value = null;
     newMessage.value = '';
-    scrollToBottom();
+    // Ensure scrolling happens after message is added
+    nextTick(() => {
+      scrollToBottom();
+    });
 };
 
 
@@ -413,9 +665,66 @@ const loadLastMessagesForAllContacts = async () => {
   }
 };
 
-const handleLogout = async () => {
-  const logoutSuccess = await authStore.logout();
-  if (logoutSuccess) router.push('/login');
+// Dialog states
+const showLogoutDialog = ref(false);
+const isLoggingOut = ref(false);
+const showDeleteDialog = ref(false);
+const isDeletingContact = ref(false);
+const contactToDelete = ref(null);
+
+const handleLogout = () => {
+  showLogoutDialog.value = true;
+};
+
+const closeLogoutDialog = () => {
+  showLogoutDialog.value = false;
+  isLoggingOut.value = false;
+};
+
+const handleLogoutOnly = async () => {
+  isLoggingOut.value = true;
+  try {
+    const logoutSuccess = await authStore.logout(false); // Skip confirmation dialog
+    if (logoutSuccess) {
+      router.push('/login');
+    }
+  } catch (error) {
+    ElMessage.error('Logout failed');
+  } finally {
+    isLoggingOut.value = false;
+    showLogoutDialog.value = false;
+  }
+};
+
+const handleLogoutAndSaveKeys = async () => {
+  // First export and download the keys
+  try {
+    const x25519 = localStorage.getItem('x25519PrivateKey');
+    const ed25519 = localStorage.getItem('ed25519PrivateKey');
+    const exportObj = { x25519PrivateKey: x25519, ed25519PrivateKey: ed25519 };
+    
+    // Create download
+    const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${authStore.user?.username || 'user'}-private-keys.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    ElMessage.success('Private keys downloaded! Logging out...');
+    
+    // Small delay to ensure download completes
+    setTimeout(async () => {
+      await handleLogoutOnly();
+    }, 1000);
+    
+  } catch (error) {
+    ElMessage.error('Failed to save keys');
+    isLoggingOut.value = false;
+  }
 };
 
 const handleAttachFile = () => {
@@ -455,17 +764,34 @@ const handleContactCommand = (command) => {
   else if (action === 'unblock') handleUnblockContact(user);
 };
 
-const handleDeleteContact = async (contactToDelete) => {
-  ElMessageBox.confirm(`Are you sure you want to delete ${contactToDelete.nickname}?`, 'Confirm Deletion', { type: 'warning' })
-    .then(async () => {
-      await friendshipService.unfriend(contactToDelete.username);
-      await refreshFriendData();
-      if (currentChatTarget.value?.id === contactToDelete.id) {
-        currentChatTarget.value = null;
-        messages.value = [];
-      }
-      ElMessage({ type: 'success', message: `${contactToDelete.nickname} has been deleted.` });
-    }).catch(() => {});
+const handleDeleteContact = (contact) => {
+  contactToDelete.value = contact;
+  showDeleteDialog.value = true;
+};
+
+const closeDeleteDialog = () => {
+  showDeleteDialog.value = false;
+  isDeletingContact.value = false;
+  contactToDelete.value = null;
+};
+
+const confirmDeleteContact = async () => {
+  if (!contactToDelete.value) return;
+  
+  isDeletingContact.value = true;
+  try {
+    await friendshipService.unfriend(contactToDelete.value.username);
+    await refreshFriendData();
+    if (currentChatTarget.value?.id === contactToDelete.value.id) {
+      currentChatTarget.value = null;
+      messages.value = [];
+    }
+    ElMessage({ type: 'success', message: `${contactToDelete.value.nickname} has been deleted.` });
+    closeDeleteDialog();
+  } catch (error) {
+    ElMessage.error('Failed to delete contact');
+    isDeletingContact.value = false;
+  }
 };
 
 const handleBlockContact = async (userToBlock) => {
@@ -600,16 +926,23 @@ async function handleFileDownload(msg) {
   }
 }
 
-function importPrivateKeys(jsonStr) {
+function importPrivateKeys(keysObj) {
   try {
-    const obj = JSON.parse(jsonStr);
+    // Check if the input is already an object or needs parsing
+    let obj;
+    if (typeof keysObj === 'string') {
+      obj = JSON.parse(keysObj);
+    } else {
+      obj = keysObj;
+    }
+    
     if (obj.x25519PrivateKey && obj.ed25519PrivateKey) {
       // It's better to delegate state updates to the store
       authStore.setX25519PrivateKey(obj.x25519PrivateKey);
       authStore.setEd25519PrivateKey(obj.ed25519PrivateKey);
       
-      ElMessage.success('Private keys imported successfully! Reloading...');
-      setTimeout(() => window.location.reload(), 1500);
+      ElMessage.success('Private keys imported successfully! Page will reload in 3 seconds to decrypt messages...');
+      setTimeout(() => window.location.reload(), 3000);
     } else {
       ElMessage.error('Invalid private key data. The file must contain x25519PrivateKey and ed25519PrivateKey.');
     }
@@ -628,18 +961,88 @@ function getDownloadBtnStyle(msg) {
 
 // --- Utils ---
 const scrollToBottom = () => {
+    console.log('🔽 ChatView scrollToBottom called');
+    console.log('📦 chatWindowRef.value:', chatWindowRef.value);
+    
     if(chatWindowRef.value) {
+        console.log('✅ chatWindowRef exists, calling child scrollToBottom');
         chatWindowRef.value.scrollToBottom();
+    } else {
+        console.log('❌ chatWindowRef does not exist');
     }
 };
 
 </script>
 
 <style scoped>
-.main-layout {
-  display: flex;
+/* Main app styles */
+.chat-app {
+  @apply font-sans antialiased;
+}
+
+/* Sidebar container */
+.sidebar-container {
+  @apply w-80 lg:w-96 flex-shrink-0 transition-all duration-300 ease-in-out z-40;
+}
+
+.sidebar-container.sidebar-hidden {
+  @apply -translate-x-full lg:translate-x-0;
+  position: fixed;
   height: 100vh;
-  width: 100vw;
-  background-color: #f0f2f5;
+}
+
+@media (min-width: 1024px) {
+  .sidebar-container.sidebar-hidden {
+    @apply translate-x-0;
+    position: relative;
+  }
+}
+
+/* Chat main container */
+.chat-main-container {
+  @apply flex-1 flex flex-col min-w-0;
+}
+
+/* Mobile header */
+.mobile-header {
+  @apply flex items-center p-4 bg-white/80 dark:bg-dark-100/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-dark-200/50 lg:hidden;
+}
+
+/* Responsive design */
+@media (max-width: 1023px) {
+  .sidebar-container {
+    @apply absolute inset-y-0 left-0 w-80 bg-white dark:bg-dark-50 shadow-2xl;
+  }
+  
+  .sidebar-container.sidebar-hidden {
+    @apply -translate-x-full;
+  }
+  
+  .chat-main-container {
+    @apply w-full;
+  }
+}
+
+/* Modal transitions */
+.modal-overlay-enter-active,
+.modal-overlay-leave-active {
+  transition: all 0.3s ease;
+}
+
+.modal-overlay-enter-from,
+.modal-overlay-leave-to {
+  opacity: 0;
+  backdrop-filter: blur(0px);
+}
+
+.modal-content-enter-active,
+.modal-content-leave-active {
+  transition: all 0.25s ease-out;
+}
+
+.modal-content-enter-from,
+.modal-content-leave-to {
+  opacity: 0;
+  transform: scale(0.8) translateY(-20px);
 }
 </style>

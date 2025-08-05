@@ -4,7 +4,7 @@ import { ref, computed } from 'vue'
 import { authService } from '@/services/authService'
 import { userService } from '@/services/userService'
 import sodium from 'libsodium-wrappers'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { exportPrivateKeysToFile } from '@/utils/keyExport'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -83,43 +83,17 @@ export const useAuthStore = defineStore('auth', () => {
     // Check if there are private keys that need to be saved
     const hasPrivateKeys = x25519PrivateKey.value || ed25519PrivateKey.value;
     
+    // Note: Confirmation dialog is now handled in ChatView.vue
+    // This function only handles the actual logout process
     if (showConfirmDialog && hasPrivateKeys) {
-      // Combined confirmation dialog: logout confirmation + private key save reminder
-      const result = await new Promise((resolve) => {
-        ElMessageBox.confirm(
-          'You are about to log out. It is recommended to export your private keys for backup, otherwise they will be lost. Would you like to export your private keys before logging out?',
-          'Logout Confirmation',
-          {
-            confirmButtonText: 'Save Keys & Logout',
-            cancelButtonText: 'Logout Only',
-            distinguishCancelAndClose: true,
-            type: 'warning',
-          }
-        ).then(() => {
-          resolve('export');
-        }).catch((action) => {
-          if (action === 'cancel') {
-            resolve('logout_only');
-          } else {
-            resolve('cancel'); // Top-right X button cancels logout
-          }
-        });
-      });
-
-      if (result === 'cancel') {
-        return false; // User cancels logout, return false
-      }
-
-      if (result === 'export') {
-        // Export private keys and download file
-        const exportObj = { 
-          x25519PrivateKey: x25519PrivateKey.value, 
-          ed25519PrivateKey: ed25519PrivateKey.value 
-        };
-        
-        // Use common utility function to export private keys
-        exportPrivateKeysToFile(exportObj, user.value?.username);
-      }
+      // Export private keys and download file
+      const exportObj = { 
+        x25519PrivateKey: x25519PrivateKey.value, 
+        ed25519PrivateKey: ed25519PrivateKey.value 
+      };
+      
+      // Use common utility function to export private keys
+      exportPrivateKeysToFile(exportObj, user.value?.username);
     }
 
     // Clean all authentication-related data

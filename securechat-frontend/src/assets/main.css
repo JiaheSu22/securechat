@@ -1,4 +1,92 @@
 @import './base.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+/* Modern chat application styles */
+@layer base {
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.2);
+    --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.1);
+    --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.15);
+  }
+
+  .dark {
+    --glass-bg: rgba(0, 0, 0, 0.3);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.4);
+  }
+
+  * {
+    @apply border-gray-200;
+  }
+
+  body {
+    @apply bg-gradient-to-br from-slate-50 to-blue-50 dark:from-dark-50 dark:to-slate-900 transition-colors duration-300;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+@layer components {
+  .glass-effect {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-float {
+    box-shadow: var(--shadow-float);
+  }
+
+
+
+  .contact-item {
+    @apply flex items-center p-4 cursor-pointer transition-all duration-200 rounded-2xl mx-3 my-1 hover:bg-white/50 dark:hover:bg-dark-100/50 relative overflow-hidden;
+  }
+
+  .contact-item::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-blue-500/0 to-blue-500/5 translate-x-full transition-transform duration-300;
+  }
+
+  .contact-item:hover::before {
+    @apply translate-x-0;
+  }
+
+  .contact-item.active {
+    @apply bg-white dark:bg-dark-100 shadow-soft border border-blue-100 dark:border-blue-900/30;
+  }
+
+  .btn-modern {
+    @apply px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-soft hover:shadow-float transform hover:scale-105 active:scale-95;
+  }
+
+  .input-modern {
+    @apply rounded-2xl border-0 bg-white/70 dark:bg-dark-100/70 backdrop-blur-sm px-4 py-3 shadow-soft transition-all duration-200 focus:ring-2 focus:ring-blue-500/50 focus:shadow-float;
+  }
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-dark-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-dark-400;
+}
 
 
