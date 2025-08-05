@@ -252,7 +252,7 @@
 import { ref, onMounted, nextTick, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import { ElNotification, ElMessage } from 'element-plus';
+import { ElNotification, ElMessage } from '@/utils/notification';
 import { friendshipService } from '@/services/friendshipService';
 import { Client } from '@stomp/stompjs';
 import sodium from 'libsodium-wrappers';
@@ -372,7 +372,7 @@ const connectWebSocket = () => {
           
           if (!currentChatTarget.value || msgObj.senderUsername !== currentChatTarget.value.username) {
             unreadMap.value[msgObj.senderUsername] = (unreadMap.value[msgObj.senderUsername] || 0) + 1;
-            ElNotification({ title: 'New Message', message: `From ${msgObj.senderUsername}`, type: 'info' });
+            ElNotification.info({ title: 'New Message', message: `From ${msgObj.senderUsername}` });
             return;
           }
           
@@ -802,7 +802,7 @@ const confirmDeleteContact = async () => {
 
 const handleBlockContact = async (userToBlock) => {
   await friendshipService.blockUser(userToBlock.username);
-  ElMessage({ type: 'warning', message: `${userToBlock.nickname} has been blocked.` });
+  ElMessage.warning(`${userToBlock.nickname} has been blocked.`);
   await refreshFriendData();
   if (currentChatTarget.value?.id === userToBlock.id) {
     messages.value.push({ id: 'system-blocked-action', text: 'You have blocked this user.', sender: 'system' });
@@ -812,7 +812,7 @@ const handleBlockContact = async (userToBlock) => {
 
 const handleUnblockContact = async (userToUnblock) => {
   await friendshipService.unblockUser(userToUnblock.username);
-  ElMessage({ type: 'success', message: `${userToUnblock.nickname} has been unblocked.` });
+  ElMessage.success(`${userToUnblock.nickname} has been unblocked.`);
   await refreshFriendData();
   if (currentChatTarget.value?.id === userToUnblock.id) {
     messages.value.push({ id: 'system-unblocked-action', text: 'You have unblocked this user.', sender: 'system' });

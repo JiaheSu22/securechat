@@ -1,5 +1,5 @@
 // src/utils/keyExport.js - Private key export utilities
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '@/utils/notification'
 
 /**
  * Export private keys to file

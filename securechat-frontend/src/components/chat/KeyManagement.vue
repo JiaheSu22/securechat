@@ -152,10 +152,9 @@
 
 <script setup>
 import { ref } from 'vue';
-import { Download, Upload } from '@element-plus/icons-vue';
 import { useAuthStore } from '@/stores/auth';
 import { exportPrivateKeysToFile, copyPrivateKeysToClipboard } from '@/utils/keyExport';
-import { ElMessage } from 'element-plus';
+import { ElMessage } from '@/utils/notification';
 
 const authStore = useAuthStore();
 const showExportDialog = ref(false);
@@ -211,7 +210,7 @@ function downloadAsFile() {
   if (!exportedKeys.value) return;
   try {
     const keys = JSON.parse(exportedKeys.value);
-    exportPrivateKeysToFile(keys, authStore.user?.username);
+  exportPrivateKeysToFile(keys, authStore.user?.username);
     ElMessage.success('Keys downloaded successfully!');
   } catch (error) {
     ElMessage.error('Failed to download keys');
@@ -224,8 +223,8 @@ function handleImport() {
   try {
     const keys = JSON.parse(importKeyStr.value);
     emit('import-keys', keys);
-    showImportDialog.value = false;
-    importKeyStr.value = '';
+  showImportDialog.value = false;
+  importKeyStr.value = '';
     // Don't show success message here - parent component will handle it
   } catch (error) {
     ElMessage.error('Invalid key format. Please ensure the JSON format is correct.');

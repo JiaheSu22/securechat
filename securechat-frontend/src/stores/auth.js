@@ -4,7 +4,6 @@ import { ref, computed } from 'vue'
 import { authService } from '@/services/authService'
 import { userService } from '@/services/userService'
 import sodium from 'libsodium-wrappers'
-import { ElMessage } from 'element-plus'
 import { exportPrivateKeysToFile } from '@/utils/keyExport'
 
 export const useAuthStore = defineStore('auth', () => {
