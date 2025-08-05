@@ -53,11 +53,11 @@ export const useAuthStore = defineStore('auth', () => {
     const x25519KeyPair = sodium.crypto_kx_keypair()
     const ed25519KeyPair = sodium.crypto_sign_keypair()
     // 4. Upload public keys
-    await userService.uploadX25519Key({ x25519PublicKey: sodium.to_base64(x25519KeyPair.publicKey) })
-    await userService.uploadEd25519Key({ ed25519PublicKey: sodium.to_base64(ed25519KeyPair.publicKey) })
+    await userService.uploadX25519Key({ x25519PublicKey: sodium.to_base64(x25519KeyPair.publicKey, sodium.base64_variants.URLSAFE_NO_PADDING) })
+    await userService.uploadEd25519Key({ ed25519PublicKey: sodium.to_base64(ed25519KeyPair.publicKey, sodium.base64_variants.URLSAFE_NO_PADDING) })
     // 5. Save private keys locally
-    setX25519PrivateKey(sodium.to_base64(x25519KeyPair.privateKey))
-    setEd25519PrivateKey(sodium.to_base64(ed25519KeyPair.privateKey))
+    setX25519PrivateKey(sodium.to_base64(x25519KeyPair.privateKey, sodium.base64_variants.URLSAFE_NO_PADDING))
+    setEd25519PrivateKey(sodium.to_base64(ed25519KeyPair.privateKey, sodium.base64_variants.URLSAFE_NO_PADDING))
       return { success: true }
   }
 
@@ -177,6 +177,8 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     isTokenExpired,
-    cleanExpiredToken
+    cleanExpiredToken,
+    setX25519PrivateKey,
+    setEd25519PrivateKey
   }
 })

@@ -43,10 +43,9 @@ public class FileController {
     public ResponseEntity<FileUploadResponse> uploadFile(@RequestParam("file") MultipartFile file) {
         String uniqueFileName = fileStorageService.storeFile(file);
 
-        String fileUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/files/")
-                .path(uniqueFileName)
-                .toUriString();
+        // Generate a relative URL path that matches the MvcConfig static resource mapping.
+        // This ensures consistency between backend serving and frontend access.
+        String fileUrl = "/files/" + uniqueFileName;
 
         FileUploadResponse response = new FileUploadResponse(
                 uniqueFileName,
