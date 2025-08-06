@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:17
+    container_name: securechat-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: securechat123
+      POSTGRES_DB: securechatdb
+      POSTGRES_USER: securechat
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - securechat-network
+
+  # Backend Spring Boot Application
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend.optimized
+    container_name: securechat-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/securechatdb
+      SPRING_DATASOURCE_USERNAME: securechat
+      SPRING_DATASOURCE_PASSWORD: securechat123
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      
+      # JPA Configuration
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: false
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      
+      # JWT Configuration
+      JWT_SECRET: f1i0C6d3js5+=MoGgF'5$gCOE|L<A%BGs&cg$.F=etTB/uYGwIg+,E`AS`0FjxO)i?_C6zipWX,&he-4L9y@iEg4~",h/QClO[j~(s`we6m,uMc%BRhMBpq('
+      
+      # File Upload Configuration
+      FILE_UPLOAD_DIR: /app/uploads
+      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 50MB
+      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 100MB
+      
+      # Server Configuration
+      SERVER_PORT: 8080
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      - postgres
+    networks:
+      - securechat-network
+
+  # Frontend Vue Application
+  frontend:
+    build:
+      context: ./securechat-frontend
+      dockerfile: Dockerfile
+    container_name: securechat-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - securechat-network
+
+  # Nginx Reverse Proxy (Optional, for production)
+  nginx:
+    image: nginx:alpine
+    container_name: securechat-nginx
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - securechat-network
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  securechat-network:
+    driver: bridge

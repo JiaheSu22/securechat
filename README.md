@@ -6,9 +6,13 @@ A simple, full-stack secure messaging application featuring **end-to-end encrypt
 
 SecureChat is designed for privacy-first, real-time communication. It leverages strong cryptography in the browser and on the backend, with all encryption and decryption performed on the client side. The server never has access to your private keys or plaintext messages.
 
-- **Frontend:** Vue 3 + Vite + Element Plus UI, with cryptography powered by [libsodium-wrappers](https://github.com/jedisct1/libsodium).
+- **Frontend:** Vue 3 + Vite + Tailwind CSS, with cryptography powered by [libsodium-wrappers](https://github.com/jedisct1/libsodium).
 - **Backend:** Spring Boot 3 (Java 17), RESTful API, JWT authentication, and WebSocket for real-time messaging.
-- **Database:** MySQL (for user and message metadata).
+- **Database:** PostgreSQL (for user and message metadata).
+
+## Demo
+
+![SecureChat Demo](docs/images/demo.png)
 
 ---
 
@@ -83,16 +87,18 @@ SecureChat uses the following cryptography library in the frontend:
   - Provides robust, audited cryptographic primitives for key generation, ECDH, and authenticated encryption.
 
 **Other major frontend dependencies:**
-- Vue 3, Element Plus, Pinia, Axios, @stomp/stompjs
+- Vue 3, Pinia, Axios, @stomp/stompjs, Tailwind CSS
 
 ---
 
 ## Deployment Guide
 
+This project is configured for easy deployment using Docker.
+
 ### Prerequisites
 
-- **Backend:** JDK 17+, Maven, MySQL
-- **Frontend:** Node.js 18+, npm
+- **Docker** and **Docker Compose**
+- **Git** (for cloning the repository)
 
 ### 1. Clone the Repository
 
@@ -101,31 +107,60 @@ git clone https://github.com/your-repository/securechat.git
 cd securechat
 ```
 
-### 2. Backend Setup
+### 2. Configure Environment Variables
 
+Create a `.env` file in the root directory by copying the example file:
 ```bash
-# Build the backend
-mvn clean package
+cp env.example .env
+```
+Review and adjust the variables in `.env` as needed. The default values are suitable for a local development environment.
 
-# Start the backend (default port 8080)
-mvn spring-boot:run
+### 3. Run with Docker Compose
+
+Build and start all services (frontend, backend, database) in detached mode:
+```bash
+docker-compose up --build -d
+```
+The application will be available at `http://localhost`.
+
+- The **frontend** is served on port `80`.
+- The **backend** API is available on port `8080`.
+- **PostgreSQL** database runs on port `5432`.
+
+### 4. Stop the Application
+
+To stop the services, run:
+```bash
+docker-compose down
 ```
 
-- Configure your MySQL database and application properties as needed.
+### (Optional) Local Development without Docker
 
-### 3. Frontend Setup
+If you prefer to run the services locally without Docker:
 
-```bash
-cd securechat-frontend
-npm install
-npm run build   # For production
-npm run dev     # For development (default port 5173)
-```
+#### Prerequisites
+- **Backend:** JDK 17+, Maven, PostgreSQL
+- **Frontend:** Node.js 18+, npm
 
-### 4. Access the Application
+#### Backend Setup
+1.  Configure your PostgreSQL database connection in `src/main/resources/application.properties`.
+2.  Build and run the Spring Boot application:
+    ```bash
+    # From the root directory
+    mvn spring-boot:run
+    ```
 
-- Open your browser at [http://localhost:5173](http://localhost:5173) (frontend)
-- The backend API runs at [http://localhost:8080](http://localhost:8080)
+#### Frontend Setup
+1.  Navigate to the frontend directory:
+    ```bash
+    cd securechat-frontend
+    ```
+2.  Install dependencies and start the development server:
+    ```bash
+    npm install
+    npm run dev
+    ```
+The frontend will be accessible at `http://localhost:5173`.
 
 ---
 

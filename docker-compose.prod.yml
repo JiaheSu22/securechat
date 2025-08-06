@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:17
+    container_name: securechat-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securechat123}
+      POSTGRES_DB: securechatdb
+      POSTGRES_USER: ${POSTGRES_USER:-securechat}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    networks:
+      - securechat-network-prod
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U securechat"]
+      timeout: 20s
+      retries: 10
+
+  # Backend Spring Boot Application
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend.optimized
+    container_name: securechat-backend-prod
+    restart: unless-stopped
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/securechatdb
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-securechat}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-securechat123}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      
+      # JPA Configuration
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: false
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET}
+      
+      # File Upload Configuration
+      FILE_UPLOAD_DIR: /app/uploads
+      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 50MB
+      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 100MB
+      
+      # Server Configuration
+      SERVER_PORT: 8080
+      
+      # Production Environment Configuration
+      SPRING_PROFILES_ACTIVE: prod
+    volumes:
+      - uploads_data_prod:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - securechat-network-prod
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend Vue Application
+  frontend:
+    build:
+      context: ./securechat-frontend
+      dockerfile: Dockerfile
+    container_name: securechat-frontend-prod
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - securechat-network-prod
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: securechat-nginx-prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - securechat-network-prod
+
+volumes:
+  postgres_data_prod:
+    driver: local
+  uploads_data_prod:
+    driver: local
+
+networks:
+  securechat-network-prod:
+    driver: bridge

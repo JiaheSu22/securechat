@@ -1,0 +1,49 @@
+# Git相关
+.git
+.gitignore
+
+# IDE相关
+.idea
+.vscode
+*.iml
+
+# 构建产物
+target/
+node_modules/
+dist/
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Docker相关
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# 文档
+README.md
+*.md
+
+# 测试文件
+**/test/
+**/tests/
+**/__tests__/
+
+# 开发环境文件
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# 上传文件（在容器中重新创建）
+uploads/ 
