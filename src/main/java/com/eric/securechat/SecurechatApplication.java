@@ -1,6 +1,6 @@
 package com.eric.securechat;
 
-import com.eric.securechat.config.FileStorageProperties;
+import com.eric.securechat.file.config.FileStorageProperties;
 import org.modelmapper.ModelMapper;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
